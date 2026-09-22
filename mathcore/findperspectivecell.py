@@ -14,7 +14,7 @@ def calculate_welfare_for_move(agent: dict, cell: dict) -> float:
 def find_perspective_cell(current_cell: dict, map_matrix: list[list[dict]], 
                           agents_map: dict) -> dict | None:
     """
-    1. Найти все свободные клетки в радиусе зрения.
+    1. Найти все свободные клетки в радиусе зрения (vis).
     2. Вычислить Welfare для каждой.
     3. Выбрать клетки с максимальным Welfare.
     4. Среди них выбрать ближайшие.
@@ -25,20 +25,38 @@ def find_perspective_cell(current_cell: dict, map_matrix: list[list[dict]],
         return None
     agent = agents_map[agent_id]
     cx, cy = current_cell["posx"], current_cell["posy"]
+    vis = agent["vis"]
+    
     perspective_cells = []
-    for row in map_matrix:
-        for cell in row:
+    
+    # Оптимизация: ищем только в пределах bounding box зоны видимости агента, 
+    # либо фильтруем клетки по фактическому евклидову расстоянию <= vis.
+    max_y = len(map_matrix)
+    for y in range(max_y):
+        if not map_matrix[y]:
+            continue
+        max_x = len(map_matrix[y])
+        for x in range(max_x):
+            # Быстрый предварительный отсев по bounding box для производительности
+            if abs(x - cx) > vis or abs(y - cy) > vis:
+                continue
+                
+            cell = map_matrix[y][x]
             if cell["agent_id"] is not None:
                 continue
+                
             dist = math.sqrt((cell["posx"] - cx)**2 + (cell["posy"] - cy)**2)
-            if dist <= agent["vis"]:
+            if dist <= vis:
                 perspective_cells.append((cell, dist))
+                
     if not perspective_cells:
         return None
+        
     candidates_with_welfare = []
     for cell, dist in perspective_cells:
         w = calculate_welfare_for_move(agent, cell)
         candidates_with_welfare.append({"cell": cell, "welfare": w, "dist": dist})
+        
     max_welfare = max(item["welfare"] for item in candidates_with_welfare)
     best_candidates = [
         item for item in candidates_with_welfare 
