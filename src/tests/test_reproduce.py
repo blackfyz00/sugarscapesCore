@@ -38,15 +38,15 @@ def test_reproduce_success():
     assert next_id == 4
     assert 3 in agents_map
     # Check parent resources deducted
-    assert agent_a["sugar"] == 30
-    assert agent_a["spicy"] == 30
-    assert agent_b["sugar"] == 30
-    assert agent_b["spicy"] == 30
+    assert agent_a["sugar"] == 32
+    assert agent_a["spicy"] == 32
+    assert agent_b["sugar"] == 32
+    assert agent_b["spicy"] == 32
     
-    # Check child stats
+    # Check child stats (8 + 8 = 16)
     child = agents_map[3]
-    assert child["sugar"] == 20
-    assert child["spicy"] == 20
+    assert child["sugar"] == 16
+    assert child["spicy"] == 16
     # Child should be placed in an empty neighbor cell (e.g. at (0, 1) or (1, 1))
     child_cell = grid[child["y"]][child["x"]]
     assert child_cell["agent_id"] == 3
