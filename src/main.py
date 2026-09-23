@@ -1,13 +1,17 @@
 import json
 import random as rand
 from utils.create_map import create_map
-from utils.exporter import export_simulation_to_zip
-from pipeline import build_pipeline
 from utils.init_agents import initialize_agents
+from pipeline import build_pipeline
+
+# Импортируем новые модули
+from utils.metrics import aggregate_metrics
+from utils.plotter import render_charts_from_data
+from utils.exporter import save_simulation_archive
 
 def main():
     try:
-        with open("config.json", "r", encoding="utf-8") as f:
+        with open("./config.json", "r", encoding="utf-8") as f:
             config = json.load(f)
     except FileNotFoundError:
         with open("src/config.json", "r", encoding="utf-8") as f:
@@ -18,13 +22,14 @@ def main():
         rand.seed(seed)
 
     print("🌍 Инициализация мира...")
-    grid_size = config.get("grid_size", 100)
     num_agents = config.get("num_agents", 60)
+    grid_size = config.get("grid_size", 100)
+    map_file = config.get("map_file", None) # Или берем первый из map_files
+    grid = create_map(grid_size, map_file)
+    
     steps = config.get("steps", 100)
     
-    grid = create_map(grid_size)
-    
-    # Инициализируем агентов с учетом конфига и пайплайна
+    # Инициализируем агентов
     agents_map, next_agent_id = initialize_agents(grid, config)
 
     # Создаем пайплайн
@@ -41,30 +46,49 @@ def main():
     print(f"⚙️ Шагов в пайплайне: {len(pipeline)}")
 
     for step in range(1, steps + 1):
-        # Контекст для текущего шага
         context = {
             "step": step,
             "grid": grid,
             "agents_map": agents_map,
             "simulation_history": simulation_history,
             "meta": meta,
-            # Передаем конфиг для условной логики внутри стратегий
-            "enable_trade": config.get("enable_trade", True),
-            "enable_reproduction": config.get("enable_reproduction", True),
+            "config": config, 
         }
 
         # Выполняем пайплайн
         for strategy in pipeline:
             strategy(context)
         
-        # Обновляем next_agent_id из meta
+        # Обновляем ID
         next_agent_id = meta["next_agent_id"]
         
         if step % 10 == 0:
             print(f"⏳ Шаг {step}. Живых агентов: {len(agents_map)}")
 
-    export_simulation_to_zip(simulation_history, grid_size, output_filename="simulation.zip")
-
-
+    # --- БЛОК АНАЛИТИКИ И ЭКСПОРТА ---
+    print("📊 Обработка данных и генерация графиков...")
+    
+    # 1. Агрегируем метрики из истории
+    metrics_data, final_welfares = aggregate_metrics(simulation_history)
+    
+    # 2. Рисуем графики по полученным данным
+    charts = render_charts_from_data(metrics_data, final_welfares)
+    
+    # 3. Формируем метаданные
+    metadata = {
+        "total_steps": len(simulation_history),
+        "grid_width": grid_size,
+        "grid_height": grid_size,
+        "seed": seed
+    }
+    
+    # 4. Сохраняем всё в архив через чистую функцию экспортера
+    output_path = save_simulation_archive(
+        history=simulation_history, 
+        charts=charts, 
+        metadata=metadata, 
+        filename="sim_data.zip"
+    )
+    
 if __name__ == "__main__":
     main()

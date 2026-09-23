@@ -1,1 +1,1 @@
-from .move_strategy import movement_strategy
+from .move_cobb_strategy import movement_strategy

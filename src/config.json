@@ -1,12 +1,37 @@
 {
-  "seed": 42,
-  "grid_size": 100,
-  "num_agents": 60,
-  "steps": 100,
-  "enable_trade": true,
-  "enable_aging": true,
-  "enable_reproduction": true,
-  "enable_regeneration": true,
-  "sugar_range": [15, 25],
-  "spicy_range": [15, 25]
+	"agent": {
+		"age": 0,
+		"history_trades": [],
+		"max_age": [70, 110], 
+		"spicy": [50, 100], 
+		"spicym": [1, 2],
+		"sugar": [60, 110], 
+		"sugarm": [2, 3],
+		"vis": [20, 40] 
+	},
+	"grid_size": 100,
+	"map_file": "map1.txt",
+	"num_agents": 300, 
+	"pipeline_steps": [
+		"movement_cobb_douglas",
+		"eat_all",
+		"trading_cobb_douglas",
+		"aging",
+		"reproduction",
+		"death",
+		"disease"
+	],
+	"regeneration_map": {
+		"regeneration_sugar": 1,
+		"regeneration_spicy": 1,
+		"max_val": 4
+	},
+	"reproduction": {
+		"minimal_resources": 20, 
+		"percent_to_child": 0.10,
+		"probability": [0.4, 1],
+		"max_child": [0, 5]
+	},
+	"seed": 42,
+	"steps": 100 
 }

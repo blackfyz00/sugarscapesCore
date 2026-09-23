@@ -4,11 +4,11 @@ from mechanics.eat.eat import eat
 
 def test_normal_consumption():
     """Агент успешно ест и тратит метаболизм"""
-    # Создаем агента с 10 сахара и метаболизмом 2
-    agent = create_agent(id=1, x=0, y=0, sugar=10, spicy=10, sugarm=2, spicym=2)
+    config = {"agent": {"sugar": 10, "spicy": 10, "sugarm": 2, "spicym": 2}}
+    agent = create_agent(id=1, x=0, y=0, config=config)
     
     # Создаем клетку с 5 ресурсами
-    cell = create_cell(posx=0, posy=0, sugar=5, spicy=5)
+    cell = create_cell(x=0, y=0, sugar=5, spicy=5)
     cell["agent_id"] = 1
     
     agents_map = {1: agent}
@@ -24,7 +24,7 @@ def test_normal_consumption():
 
 def test_empty_cell_no_crash():
     """Функция не падает, если в клетке нет агента"""
-    cell = create_cell(posx=0, posy=0, sugar=5, spicy=5)
+    cell = create_cell(x=0, y=0, sugar=5, spicy=5)
     # agent_id по умолчанию None
     grid = [[cell]]
     
@@ -32,9 +32,10 @@ def test_empty_cell_no_crash():
     eat(cell, {}, grid) 
 
 def test_starvation_scenario():
-    """Агент умирает и удаляется из карты, если ресурсы <= 0 после метаболизма"""
-    agent = create_agent(id=1, x=0, y=0, sugar=1, spicy=1, sugarm=3, spicym=3)
-    cell = create_cell(posx=0, posy=0, sugar=0, spicy=0)
+    """Агент истощается, если ресурсы <= 0 после метаболизма (удаление происходит на шаге death)"""
+    config = {"agent": {"sugar": 1, "spicy": 1, "sugarm": 3, "spicym": 3}}
+    agent = create_agent(id=1, x=0, y=0, config=config)
+    cell = create_cell(x=0, y=0, sugar=0, spicy=0)
     cell["agent_id"] = 1
     
     agents_map = {1: agent}
@@ -42,5 +43,6 @@ def test_starvation_scenario():
     
     eat(cell, agents_map, grid)
     
-    # Проверяем, что агент был удален из словаря
-    assert 1 not in agents_map, "Голодный агент должен быть удален из agents_map"
+    # Проверяем, что ресурсы стали отрицательными / равны нулю, а удаление контролируется отдельно
+    assert agent["sugar"] <= 0
+    assert agent["spicy"] <= 0

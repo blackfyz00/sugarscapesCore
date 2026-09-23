@@ -1,1 +1,1 @@
-from .trade_strategy import trading_strategy
+from .trade_cobb_strategy import trading_strategy

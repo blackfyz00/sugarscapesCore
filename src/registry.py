@@ -1,18 +1,11 @@
+# registry.py
 import importlib
 
 REGISTRY = {}
-_LOADED_MECHANICS = set() 
+_LOADED_MECHANICS = set()
 
-# Маппинг имен механик на их пути модулей, если они отличаются от простого имени
-module_mapping = {
-    "regeneration_map": "regenerate_res.regenerate_resources_strategy",
-    "movement": "movement.move_strategy",
-    "eat": "eat.eat_strategy",
-    "trading": "trade.trade_strategy",
-    "reproduction": "reproduce.reproduce_strategy",
-    "aging": "aging.aging_strategy",
-    "death": "death.death_strategy"
-}
+# Импортируем наш новый реестр
+from module_mapping import MODULE_MAPPING
 
 def register_strategy(name):
     def decorator(func):
@@ -24,12 +17,19 @@ def load_mechanic(mechanic_name: str):
     if mechanic_name in _LOADED_MECHANICS:
         return
     
-    submodule = module_mapping.get(mechanic_name, mechanic_name)
+    # Берем информацию из нового реестра
+    module_info = MODULE_MAPPING.get(mechanic_name)
+    if not module_info:
+        print(f"⚠️ Механика '{mechanic_name}' не найдена в MODULE_REGISTRY")
+        return
+
+    submodule_path = module_info["strategy"]
     
     try:
-        importlib.import_module(f'mechanics.{submodule}')
+        # Импортируем модуль стратегии
+        importlib.import_module(f'mechanics.{submodule_path}')
         _LOADED_MECHANICS.add(mechanic_name)
     except ModuleNotFoundError:
-        print(f"⚠️ Модуль для механики '{mechanic_name}' (mechanics.{submodule}) не найден.")
+        print(f"⚠️ Модуль для механики '{mechanic_name}' (mechanics.{submodule_path}) не найден.")
     except Exception as e:
         print(f"❌ Ошибка внутри механики '{mechanic_name}': {e}")

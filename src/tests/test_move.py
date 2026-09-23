@@ -4,11 +4,11 @@ from mechanics.movement.move import move
 
 def test_successful_move():
     """Агент успешно перемещается из одной клетки в другую"""
-    agent = create_agent(id=1, x=0, y=0)
-    cell_from = create_cell(posx=0, posy=0, sugar=0, spicy=0)
+    agent = create_agent(id=1, x=0, y=0, config={"agent": {}})
+    cell_from = create_cell(x=0, y=0, sugar=0, spicy=0)
     cell_from["agent_id"] = 1
     
-    cell_to = create_cell(posx=1, posy=0, sugar=5, spicy=5)
+    cell_to = create_cell(x=1, y=0, sugar=5, spicy=5)
     
     agents_map = {1: agent}
     
@@ -22,9 +22,8 @@ def test_successful_move():
 
 def test_move_from_empty_cell():
     """Нельзя переместить агента, если в исходной клетке нет агента"""
-    cell_from = create_cell(posx=0, posy=0, sugar=0, spicy=0)
-    # agent_id по умолчанию None
-    cell_to = create_cell(posx=1, posy=0, sugar=5, spicy=5)
+    cell_from = create_cell(x=0, y=0, sugar=0, spicy=0)
+    cell_to = create_cell(x=1, y=0, sugar=5, spicy=5)
     agents_map = {}
     
     success = move(cell_from, cell_to, agents_map)
@@ -33,13 +32,13 @@ def test_move_from_empty_cell():
 
 def test_move_to_occupied_cell():
     """Нельзя переместиться в занятую клетку"""
-    agent1 = create_agent(id=1, x=0, y=0)
-    agent2 = create_agent(id=2, x=1, y=0)
+    agent1 = create_agent(id=1, x=0, y=0, config={"agent": {}})
+    agent2 = create_agent(id=2, x=1, y=0, config={"agent": {}})
     
-    cell_from = create_cell(posx=0, posy=0, sugar=0, spicy=0)
+    cell_from = create_cell(x=0, y=0, sugar=0, spicy=0)
     cell_from["agent_id"] = 1
     
-    cell_to = create_cell(posx=1, posy=0, sugar=5, spicy=5)
+    cell_to = create_cell(x=1, y=0, sugar=5, spicy=5)
     cell_to["agent_id"] = 2
     
     agents_map = {1: agent1, 2: agent2}
