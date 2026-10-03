@@ -62,44 +62,25 @@ def main():
     print(f"⚙️ Шагов в пайплайне: {len(pipeline)}")
 
     for step in range(1, steps + 1):
-        # Превращаем WorldState в список списков словарей для совместимости с текущим пайплайном механик
-        grid_dict_list = world.to_dict_list()
-        
-        # Получаем адаптер словарей для немигрированных механик (движение, торговля, размножение)
-        agents_map = agents.to_dict_map()
-
         context = {
             "step": step,
-            "grid": grid_dict_list,
-            "world": world,  # ссылка на объект WorldState для векторизованных шагов
-            "agents": agents,  # ссылка на AgentSystem для векторизованных агентов
-            "agents_map": agents_map, # адаптер для старых стратегий
+            "world": world,  # Ссылка на WorldState (NumPy)
+            "agents": agents,  # Ссылка на AgentSystem (SoA NumPy)
             "simulation_history": simulation_history,
             "meta": meta,
             "config": config, 
         }
 
-        # Выполняем пайплайн
+        # Выполняем пайплайн полностью на векторизованных структурах без словарей в горячем цикле
         for strategy in pipeline:
             strategy(context)
-        
-        # Синхронизируем изменения из agents_map обратно в AgentSystem (если старые стратегии изменили агентов)
-        agents.update_from_dict_map(agents_map)
-        
-        # Синхронизируем изменения occupancy обратно в world.occupancy из grid_dict_list и agents
-        world.occupancy.fill(-1)
-        alive_indices = agents.get_alive_indices()
-        for idx in alive_indices:
-            x, y = int(agents.x[idx]), int(agents.y[idx])
-            aid = int(agents.id[idx])
-            if 0 <= x < world.size and 0 <= y < world.size:
-                world.occupancy[y, x] = aid
 
         # Обновляем ID
         next_agent_id = meta["next_agent_id"]
         
         if step % 10 == 0:
-            print(f"⏳ Шаг {step}. Живых агентов: {len(alive_indices)}")
+            alive_count = len(agents.get_alive_indices())
+            print(f"⏳ Шаг {step}. Живых агентов: {alive_count}")
 
     # --- БЛОК АНАЛИТИКИ И ЭКСПОРТА ---
     print("📊 Обработка данных и генерация графиков...")
@@ -118,12 +99,13 @@ def main():
         "seed": seed
     }
     
-    # 4. Сохраняем всё в архив через чистую функцию экспортера
+    # 4. Сохраняем всё в архив с бинарными .npy картами для Godot
     output_path = save_simulation_archive(
         history=simulation_history, 
         charts=charts, 
         metadata=metadata, 
-        filename="sim_data.zip"
+        filename="sim_data.zip",
+        world=world
     )
     
 if __name__ == "__main__":
