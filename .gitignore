@@ -223,4 +223,5 @@ __marimo__/
 .aider*
 t.txt
 sim_data*
+gitignore/
 mathcore/test/feature.md
