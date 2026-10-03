@@ -4,6 +4,7 @@ from utils.create_map import create_map
 from utils.init_agents import initialize_agents
 from pipeline import build_pipeline
 from core.world import WorldState
+from core.agents import AgentSystem
 
 # Импортируем новые модули
 from utils.metrics import aggregate_metrics
@@ -30,8 +31,22 @@ def main():
     
     steps = config.get("steps", 100)
     
-    # Инициализируем агентов
-    agents_map, next_agent_id = initialize_agents(world, config)
+    # Инициализируем агентов через AgentSystem
+    agents = AgentSystem(capacity=num_agents * 5)
+    from classes import create_agent
+    
+    next_agent_id = 1
+    for _ in range(num_agents):
+        placed = False
+        while not placed:
+            x = rand.randint(0, grid_size - 1)
+            y = rand.randint(0, grid_size - 1)
+            if world.occupancy[y, x] == -1:
+                agent_dict = create_agent(id=next_agent_id, x=x, y=y, config=config)
+                agents.spawn(next_agent_id, x, y, agent_dict)
+                world.occupancy[y, x] = next_agent_id
+                next_agent_id += 1
+                placed = True
 
     # Создаем пайплайн
     pipeline = build_pipeline(config)
@@ -49,12 +64,16 @@ def main():
     for step in range(1, steps + 1):
         # Превращаем WorldState в список списков словарей для совместимости с текущим пайплайном механик
         grid_dict_list = world.to_dict_list()
+        
+        # Получаем адаптер словарей для немигрированных механик (движение, торговля, размножение)
+        agents_map = agents.to_dict_map()
 
         context = {
             "step": step,
             "grid": grid_dict_list,
             "world": world,  # ссылка на объект WorldState для векторизованных шагов
-            "agents_map": agents_map,
+            "agents": agents,  # ссылка на AgentSystem для векторизованных агентов
+            "agents_map": agents_map, # адаптер для старых стратегий
             "simulation_history": simulation_history,
             "meta": meta,
             "config": config, 
@@ -64,17 +83,23 @@ def main():
         for strategy in pipeline:
             strategy(context)
         
-        # Синхронизируем изменения occupancy обратно в world.occupancy из grid_dict_list
-        for y in range(world.size):
-            for x in range(world.size):
-                aid = grid_dict_list[y][x]["agent_id"]
-                world.occupancy[y, x] = aid if aid is not None else -1
+        # Синхронизируем изменения из agents_map обратно в AgentSystem (если старые стратегии изменили агентов)
+        agents.update_from_dict_map(agents_map)
+        
+        # Синхронизируем изменения occupancy обратно в world.occupancy из grid_dict_list и agents
+        world.occupancy.fill(-1)
+        alive_indices = agents.get_alive_indices()
+        for idx in alive_indices:
+            x, y = int(agents.x[idx]), int(agents.y[idx])
+            aid = int(agents.id[idx])
+            if 0 <= x < world.size and 0 <= y < world.size:
+                world.occupancy[y, x] = aid
 
         # Обновляем ID
         next_agent_id = meta["next_agent_id"]
         
         if step % 10 == 0:
-            print(f"⏳ Шаг {step}. Живых агентов: {len(agents_map)}")
+            print(f"⏳ Шаг {step}. Живых агентов: {len(alive_indices)}")
 
     # --- БЛОК АНАЛИТИКИ И ЭКСПОРТА ---
     print("📊 Обработка данных и генерация графиков...")
