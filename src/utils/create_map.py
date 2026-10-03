@@ -1,9 +1,10 @@
 # src/utils/create_map.py
 import random as rand
 from pathlib import Path
-from classes import create_cell
+import numpy as np
+from core.world import WorldState
 
-def create_map(grid_size: int = None, map_filename: str = None) -> list[list[dict]]:
+def create_map(grid_size: int = None, map_filename: str = None) -> WorldState:
     if map_filename:
         map_path = Path(__file__).parent.parent / "maps" / map_filename
     else:
@@ -12,11 +13,10 @@ def create_map(grid_size: int = None, map_filename: str = None) -> list[list[dic
     if not map_path.exists():
         size = grid_size or 15
         print(f"⚠️ Файл карты '{map_path}' не найден! Генерирую случайную карту {size}x{size}.")
-        return [
-            [create_cell(x=x, y=y, sugar=rand.randint(0, 4), spicy=rand.randint(0, 4)) 
-             for x in range(size)] 
-             for y in range(size)
-        ]
+        world = WorldState(size)
+        world.sugar_map = np.random.randint(0, 5, size=(size, size), dtype=np.int16)
+        world.spicy_map = np.random.randint(0, 5, size=(size, size), dtype=np.int16)
+        return world
     
     with open(map_path, 'r') as f:
         content = f.read()
@@ -26,7 +26,6 @@ def create_map(grid_size: int = None, map_filename: str = None) -> list[list[dic
     
     if len(blocks) < 2:
         print("⚠️ В файле не найдено две карты. Использую старую логику (одна карта + формула).")
-        # Здесь можно оставить старую логику или выдать ошибку
         lines = [line.strip() for line in content.splitlines() if line.strip()]
         src_rows = len(lines)
         src_cols = len(lines[0].split()) if lines else 0
@@ -42,9 +41,9 @@ def create_map(grid_size: int = None, map_filename: str = None) -> list[list[dic
     
     print(f"🗺️ Масштабирую карты из {src_rows}x{src_cols} в {target_size}x{target_size}")
 
-    grid = []
+    world = WorldState(target_size)
+    
     for y in range(target_size):
-        row = []
         for x in range(target_size):
             # Находим соответствующие координаты в исходных картах
             src_y = min(int(y * src_rows / target_size), src_rows - 1)
@@ -63,14 +62,13 @@ def create_map(grid_size: int = None, map_filename: str = None) -> list[list[dic
                 except (IndexError, ValueError):
                     sp_val = 0
             else:
-                # Старая логика, если второй карты нет
                 sp_val = max(0, 90 - s_val)
 
             # Добавляем шум
             sugar = max(0, s_val + rand.randint(-2, 2))
             spicy = max(0, sp_val + rand.randint(-2, 2))
 
-            row.append(create_cell(x=x, y=y, sugar=sugar, spicy=spicy))
-        grid.append(row)
+            world.sugar_map[y, x] = sugar
+            world.spicy_map[y, x] = spicy
         
-    return grid
+    return world
