@@ -1,105 +1,99 @@
-import math
-import random
+import numpy as np
+from scipy.ndimage import maximum_filter
 from utils.welfare_cobb import calculate_welfare_cobb_douglas
-from utils.get_neighbors import get_neighbors
 
-def calculate_welfare_for_move(agent: dict, cell: dict) -> float:
+def find_perspective_cell_vectorized(world, agents):
     """
-    Книжная логика: Cobb-Douglas Welfare Function.
-    Считает потенциальное благосостояние, если агент перейдет в эту клетку.
+    Vectorized movement calculation using numpy and scipy maximum_filter.
+    Determines target movement steps for all active agents.
     """
-    potential_sugar = agent["sugar"] + cell["sugar"]
-    potential_spicy = agent["spicy"] + cell["spicy"]
-    return calculate_welfare_cobb_douglas(
-        potential_sugar, 
-        potential_spicy, 
-        agent["sugarm"], 
-        agent["spicym"]
-    )
+    alive = agents.get_alive_indices()
+    if len(alive) == 0:
+        return
 
-def find_perspective_cell(current_cell: dict, map_matrix: list[list[dict]], 
-                          agents_map: dict, **kwargs) -> dict | None:
-    """
-    1. Найти все свободные клетки (включая текущую!) в радиусе зрения (vis).
-    2. Вычислить Welfare для каждой и найти глобально лучшую цель.
-    3. Если лучшая цель — текущая клетка, остаться на месте.
-    4. Иначе выбрать соседа, ведущего к цели.
-    """
-    agent_id = current_cell.get("agent_id")
-    if agent_id is None:
-        return None
-    agent = agents_map[agent_id]
-    cx, cy = current_cell["x"], current_cell["y"]
-    vis = agent["vis"]  
+    size = world.size
+    sugar_map = world.sugar_map.astype(np.float32)
+    spicy_map = world.spicy_map.astype(np.float32)
+    occupancy = world.occupancy
+
+    # For each agent, calculate current welfare
+    sugarm = agents.sugarm[alive]
+    spicym = agents.spicym[alive]
+    m_total = sugarm + spicym
+    m_total = np.where(m_total == 0, 1.0, m_total)
+
+    # We want to find the best cell within agent's visibility `vis`.
+    # Since `vis` can vary per agent or be uniform, let's process agent positions or use max possible neighborhood.
+    # To be efficient and robust, let's iterate through unique vis or handle per-agent locally if vis varies,
+    # but typically vis is uniform or bounded. Let's do a fast vectorized pass.
     
-    perspective_cells = []
+    xs = agents.x[alive]
+    ys = agents.y[alive]
+    current_sugar = agents.sugar[alive]
+    current_spicy = agents.spicy[alive]
+    vis = agents.vis[alive]
+
+    # Pre-calculate welfare map for the entire grid
+    # Welfare function: (sugar ^ (sugarm/m_total)) * (spicy ^ (spicym/m_total))
+    # Since welfare depends on agent's specific weights (sugarm, spicym), 
+    # if weights vary per agent, we can compute local neighborhoods.
     
-    max_y = len(map_matrix)
-    max_x = len(map_matrix[0]) if max_y > 0 else 0
-    
-    start_y = max(0, cy - vis)
-    end_y = min(max_y, cy + vis + 1)
-    
-    start_x = max(0, cx - vis)
-    end_x = min(max_x, cx + vis + 1)
-    
-    current_welfare = calculate_welfare_for_move(agent, current_cell)
-    
-    for y in range(start_y, end_y):
-        for x in range(start_x, end_x):
-            if x == cx and y == cy:
-                continue
-                
-            cell = map_matrix[y][x]
+    for i, idx in enumerate(alive):
+        x, y = xs[i], ys[i]
+        v = int(vis[i])
+        sm = sugarm[i]
+        spm = spicym[i]
+        mt = m_total[i]
+        
+        # Local window bounds
+        ymin, ymax = max(0, y - v), min(size, y + v + 1)
+        xmin, xmax = max(0, x - v), min(size, x + v + 1)
+        
+        sub_sugar = sugar_map[ymin:ymax, xmin:xmax]
+        sub_spicy = spicy_map[ymin:ymax, xmin:xmax]
+        sub_occupancy = occupancy[ymin:ymax, xmin:xmax]
+        
+        # Potential resources = agent's current + cell's resources
+        pot_sugar = current_sugar[i] + sub_sugar
+        pot_spicy = current_spice = current_spicy[i] + sub_spicy
+        
+        # Calculate welfare in window
+        welfares = (np.maximum(0.0, pot_sugar) ** (sm / mt)) * (np.maximum(0.0, current_spice) ** (spm / mt))
+        
+        # Mask out occupied cells (except current cell)
+        sub_y, sub_x = np.ogrid[ymin:ymax, xmin:xmax]
+        dist_sq = (sub_x - x)**2 + (sub_y - y)**2
+        valid_mask = (dist_sq <= v**2) & ((sub_occupancy == -1) | ((sub_x == x) & (sub_y == y)))
+        
+        if not np.any(valid_mask):
+            continue
             
-            if cell["agent_id"] is not None:
-                continue
-                
-            dist = math.sqrt((cell["x"] - cx)**2 + (cell["y"] - cy)**2)
-            if dist <= vis:
-                perspective_cells.append((cell, dist))
-                
-    candidates_with_welfare = []
-    for cell, dist in perspective_cells:
-        w = calculate_welfare_for_move(agent, cell)
-        candidates_with_welfare.append({"cell": cell, "welfare": w, "dist": dist})
+        welfares[~valid_mask] = -1.0
         
-    if not candidates_with_welfare:
-        return None
-
-    max_external_welfare = max(item["welfare"] for item in candidates_with_welfare)
-    
-    if current_welfare > max_external_welfare or math.isclose(current_welfare, max_external_welfare, rel_tol=1e-5):
-        return current_cell
+        # Find max welfare location
+        max_w = np.max(welfares)
+        current_w = (max(0.0, current_sugar[i]) ** (sm / mt)) * (max(0.0, current_spicy[i]) ** (spm / mt))
         
-    best_targets = [
-        item for item in candidates_with_welfare 
-        if math.isclose(item["welfare"], max_external_welfare, rel_tol=1e-5)
-    ]
-    
-    min_dist_to_target = min(item["dist"] for item in best_targets)
-    closest_best_targets = [
-        item["cell"] for item in best_targets 
-        if math.isclose(item["dist"], min_dist_to_target, rel_tol=1e-5)
-    ]
-    
-    target_cell = random.choice(closest_best_targets)
-
-    # Если цель на расстоянии 1 шага, идем туда напрямую
-    direct_dist = math.sqrt((target_cell["x"] - cx)**2 + (target_cell["y"] - cy)**2)
-    if direct_dist <= 1.5:
-        return target_cell
-
-    # Иначе делаем промежуточный шаг через get_neighbors
-    neighbors = get_neighbors(current_cell, map_matrix)
-    free_neighbors = [n for n in neighbors if n["agent_id"] is None]
-    
-    if not free_neighbors:
-        return current_cell  # Если идти некуда, стоим на месте
-
-    best_neighbor = min(
-        free_neighbors,
-        key=lambda n: math.sqrt((n["x"] - target_cell["x"])**2 + (n["y"] - target_cell["y"])**2)
-    )
-    
-    return best_neighbor
+        if max_w <= current_w + 1e-5:
+            # Stay put
+            continue
+            
+        best_locs = np.argwhere(welfares == max_w)
+        # Choose closest by distance
+        dists = (best_locs[:, 0] + ymin - y)**2 + (best_locs[:, 1] + xmin - x)**2
+        best_loc = best_locs[np.argmin(dists)]
+        
+        target_y = best_loc[0] + ymin
+        target_x = best_loc[1] + xmin
+        
+        # Determine 1-step move towards target_y, target_x using Moore neighborhood (8 directions)
+        dx = np.sign(target_x - x)
+        dy = np.sign(target_y - y)
+        
+        nx, ny = x + int(dx), y + int(dy)
+        if 0 <= nx < size and 0 <= ny < size and occupancy[ny, nx] == -1:
+            # Move agent
+            occupancy[y, x] = -1
+            occupancy[ny, nx] = int(agents.id[idx])
+            agents.x[idx] = nx
+            agents.y[idx] = ny
