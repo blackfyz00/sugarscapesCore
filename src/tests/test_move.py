@@ -14,7 +14,7 @@ def test_successful_move():
     world.spicy_map[0, 1] = 10
 
     agents = AgentSystem(capacity=10)
-    idx = agents.spawn(id=1, x=0, y=0, data={"vis": 1, "sugar": 10.0, "spicy": 10.0})
+    idx = agents.spawn(agent_id=1, x=0, y=0, data={"vis": 1, "sugar": 10.0, "spicy": 10.0})
     world.occupancy[0, 0] = 1
 
     ctx = {"world": world, "agents": agents}
@@ -41,8 +41,8 @@ def test_move_to_occupied_cell():
     world.spicy_map[0, 1] = 100
 
     agents = AgentSystem(capacity=10)
-    idx1 = agents.spawn(id=1, x=0, y=0, data={"vis": 1, "sugar": 10.0, "spicy": 10.0})
-    idx2 = agents.spawn(id=2, x=0, y=1, data={"vis": 1, "sugar": 10.0, "spicy": 10.0})
+    idx1 = agents.spawn(agent_id=1, x=0, y=0, data={"vis": 1, "sugar": 10.0, "spicy": 10.0})
+    idx2 = agents.spawn(agent_id=2, x=0, y=1, data={"vis": 1, "sugar": 10.0, "spicy": 10.0})
     world.occupancy[0, 0] = 1
     world.occupancy[0, 1] = 2
 

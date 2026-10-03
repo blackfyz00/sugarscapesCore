@@ -9,8 +9,8 @@ def test_reproduce_success():
     world.occupancy.fill(-1)
     
     agents = AgentSystem(capacity=10)
-    idx_a = agents.spawn(id=1, x=0, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
-    idx_b = agents.spawn(id=2, x=1, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
+    idx_a = agents.spawn(agent_id=1, x=0, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
+    idx_b = agents.spawn(agent_id=2, x=1, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
     world.occupancy[0, 0] = 1
     world.occupancy[0, 1] = 2
     
@@ -44,8 +44,8 @@ def test_reproduce_insufficient_resources():
     world.occupancy.fill(-1)
     
     agents = AgentSystem(capacity=10)
-    agents.spawn(id=1, x=0, y=0, data={"sugar": 10.0, "spicy": 40.0, "vis": 2})
-    agents.spawn(id=2, x=1, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
+    agents.spawn(agent_id=1, x=0, y=0, data={"sugar": 10.0, "spicy": 40.0, "vis": 2})
+    agents.spawn(agent_id=2, x=1, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
     world.occupancy[0, 0] = 1
     world.occupancy[0, 1] = 2
     
@@ -68,10 +68,10 @@ def test_reproduce_no_empty_cell():
     world.occupancy.fill(-1)
     
     agents = AgentSystem(capacity=10)
-    agents.spawn(id=1, x=0, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
-    agents.spawn(id=2, x=1, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
-    agents.spawn(id=3, x=0, y=1, data={"sugar": 10.0, "spicy": 10.0, "vis": 2})
-    agents.spawn(id=4, x=1, y=1, data={"sugar": 10.0, "spicy": 10.0, "vis": 2})
+    agents.spawn(agent_id=1, x=0, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
+    agents.spawn(agent_id=2, x=1, y=0, data={"sugar": 40.0, "spicy": 40.0, "vis": 2})
+    agents.spawn(agent_id=3, x=0, y=1, data={"sugar": 10.0, "spicy": 10.0, "vis": 2})
+    agents.spawn(agent_id=4, x=1, y=1, data={"sugar": 10.0, "spicy": 10.0, "vis": 2})
     
     world.occupancy[0, 0] = 1
     world.occupancy[0, 1] = 2

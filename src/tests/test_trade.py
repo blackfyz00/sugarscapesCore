@@ -12,9 +12,9 @@ def test_successful_trade():
 
     agents = AgentSystem(capacity=10)
     # Агент A: много сахара, мало специй
-    idx_a = agents.spawn(id=1, x=0, y=0, data={"sugar": 20.0, "spicy": 5.0, "sugarm": 2.0, "spicym": 2.0})
+    idx_a = agents.spawn(agent_id=1, x=0, y=0, data={"sugar": 20.0, "spicy": 5.0, "sugarm": 2.0, "spicym": 2.0})
     # Агент B: мало сахара, много специй (сосед в (1,0))
-    idx_b = agents.spawn(id=2, x=1, y=0, data={"sugar": 5.0, "spicy": 20.0, "sugarm": 2.0, "spicym": 2.0})
+    idx_b = agents.spawn(agent_id=2, x=1, y=0, data={"sugar": 5.0, "spicy": 20.0, "sugarm": 2.0, "spicym": 2.0})
     
     world.occupancy[0, 0] = 1
     world.occupancy[0, 1] = 2
@@ -43,8 +43,8 @@ def test_no_trade_if_same_mrs():
     world.occupancy.fill(-1)
 
     agents = AgentSystem(capacity=10)
-    idx_a = agents.spawn(id=1, x=0, y=0, data={"sugar": 10.0, "spicy": 10.0, "sugarm": 2.0, "spicym": 2.0})
-    idx_b = agents.spawn(id=2, x=1, y=0, data={"sugar": 10.0, "spicy": 10.0, "sugarm": 2.0, "spicym": 2.0})
+    idx_a = agents.spawn(agent_id=1, x=0, y=0, data={"sugar": 10.0, "spicy": 10.0, "sugarm": 2.0, "spicym": 2.0})
+    idx_b = agents.spawn(agent_id=2, x=1, y=0, data={"sugar": 10.0, "spicy": 10.0, "sugarm": 2.0, "spicym": 2.0})
     
     world.occupancy[0, 0] = 1
     world.occupancy[0, 1] = 2

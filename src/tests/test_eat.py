@@ -12,7 +12,7 @@ def test_normal_consumption():
     world.occupancy[0, 0] = 1
 
     agents = AgentSystem(capacity=10)
-    idx = agents.spawn(id=1, x=0, y=0, data={"sugar": 10.0, "spicy": 10.0, "sugarm": 2.0, "spicym": 2.0})
+    idx = agents.spawn(agent_id=1, x=0, y=0, data={"sugar": 10.0, "spicy": 10.0, "sugarm": 2.0, "spicym": 2.0})
 
     ctx = {"world": world, "agents": agents}
     eat_strategy(ctx)
@@ -45,7 +45,7 @@ def test_starvation_scenario():
     world.occupancy[0, 0] = 1
 
     agents = AgentSystem(capacity=10)
-    idx = agents.spawn(id=1, x=0, y=0, data={"sugar": 1.0, "spicy": 1.0, "sugarm": 3.0, "spicym": 3.0})
+    idx = agents.spawn(agent_id=1, x=0, y=0, data={"sugar": 1.0, "spicy": 1.0, "sugarm": 3.0, "spicym": 3.0})
 
     ctx = {"world": world, "agents": agents}
     eat_strategy(ctx)
