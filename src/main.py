@@ -3,6 +3,7 @@ import random as rand
 from utils.create_map import create_map
 from utils.init_agents import initialize_agents
 from pipeline import build_pipeline
+from core.world import WorldState
 
 # Импортируем новые модули
 from utils.metrics import aggregate_metrics
@@ -24,13 +25,13 @@ def main():
     print("🌍 Инициализация мира...")
     num_agents = config.get("num_agents", 60)
     grid_size = config.get("grid_size", 100)
-    map_file = config.get("map_file", None) # Или берем первый из map_files
-    grid = create_map(grid_size, map_file)
+    map_file = config.get("map_file", None)
+    world = create_map(grid_size, map_file)
     
     steps = config.get("steps", 100)
     
     # Инициализируем агентов
-    agents_map, next_agent_id = initialize_agents(grid, config)
+    agents_map, next_agent_id = initialize_agents(world, config)
 
     # Создаем пайплайн
     pipeline = build_pipeline(config)
@@ -46,9 +47,13 @@ def main():
     print(f"⚙️ Шагов в пайплайне: {len(pipeline)}")
 
     for step in range(1, steps + 1):
+        # Превращаем WorldState в список списков словарей для совместимости с текущим пайплайном механик
+        grid_dict_list = world.to_dict_list()
+
         context = {
             "step": step,
-            "grid": grid,
+            "grid": grid_dict_list,
+            "world": world,  длинная ссылка на объект WorldState для векторизованных шагов
             "agents_map": agents_map,
             "simulation_history": simulation_history,
             "meta": meta,
@@ -59,6 +64,12 @@ def main():
         for strategy in pipeline:
             strategy(context)
         
+        # Синхронизируем изменения occupancy обратно в world.occupancy из grid_dict_list
+        for y in range(world.size):
+            for x in range(world.size):
+                aid = grid_dict_list[y][x]["agent_id"]
+                world.occupancy[y, x] = aid if aid is not None else -1
+
         # Обновляем ID
         next_agent_id = meta["next_agent_id"]
         
