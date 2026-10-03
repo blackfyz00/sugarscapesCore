@@ -1,11 +1,13 @@
 import numpy as np
-def trade_vectorized(world, agents):
+def trade_vectorized(world, agents) -> dict:
     """
     Векторизованная торговля между соседними агентами.
+    Возвращает словарь партнеров по торговле: {agent_id: partner_id}.
     """
+    trade_partners = {}
     alive = agents.get_alive_indices()
     if len(alive) < 2:
-        return
+        return trade_partners
     id_to_idx = {}
     for i in alive:
         id_to_idx[int(agents.id[i])] = i
@@ -53,4 +55,8 @@ def trade_vectorized(world, agents):
                         agents.is_trading[n_idx] = True
                         traded_set.add(aid)
                         traded_set.add(neighbor_aid)
+                        
+                        trade_partners[aid] = neighbor_aid
+                        trade_partners[neighbor_aid] = aid
                         break 
+    return trade_partners

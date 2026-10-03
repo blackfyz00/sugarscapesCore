@@ -32,6 +32,15 @@ def collect_data_strategy(ctx, params=None):
         current_spicy_map = [[cell["spicy"] for cell in row] for row in grid]
         agent_list = list(agents_map.values())
     
+    active_trades = ctx.pop("active_trades", None)
+    if active_trades:
+        for agent in agent_list:
+            agent_id = agent.get("id")
+            if agent_id in active_trades:
+                partner_id = active_trades[agent_id]
+                agent["trade_partner_id"] = partner_id
+                agent["trade_text"] = f"Сделка с #{partner_id}"
+
     step_data = {
         "step": step,
         "sugar_map": current_sugar_map,
