@@ -53,7 +53,7 @@ def main():
         context = {
             "step": step,
             "grid": grid_dict_list,
-            "world": world,  длинная ссылка на объект WorldState для векторизованных шагов
+            "world": world,  # ссылка на объект WorldState для векторизованных шагов
             "agents_map": agents_map,
             "simulation_history": simulation_history,
             "meta": meta,
