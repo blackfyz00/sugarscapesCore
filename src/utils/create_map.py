@@ -2,13 +2,31 @@
 import random as rand
 from pathlib import Path
 import numpy as np
+import sys 
 from core.world import WorldState
 
-def create_map(grid_size: int = None, map_filename: str = None) -> WorldState:
-    if map_filename:
-        map_path = Path(__file__).parent.parent / "maps" / map_filename
+def get_resource_path(relative_path):
+    """
+    Возвращает абсолютный путь к ресурсу.
+    Работает корректно как при обычном запуске, так и из PyInstaller .exe
+    """
+    if getattr(sys, 'frozen', False):
+        # Если запущено из .exe (PyInstaller), ресурсы лежат во временной папке _MEIPASS
+        base_path = Path(sys._MEIPASS)
     else:
-        map_path = Path(__file__).parent.parent / "maps" / "map1.txt"
+        # Если запущено как обычный скрипт, берем путь относительно этого файла
+        base_path = Path(__file__).parent.parent
+        
+    return base_path / relative_path
+
+def create_map(grid_size: int = None, map_filename: str = None) -> WorldState:
+    # Используем нашу новую функцию для поиска пути
+    maps_dir = get_resource_path("maps")
+    
+    if map_filename:
+        map_path = maps_dir / map_filename
+    else:
+        map_path = maps_dir / "map1.txt"
     
     if not map_path.exists():
         size = grid_size or 15
