@@ -1,7 +1,6 @@
 import json
 import random as rand
 from utils.create_map import create_map
-from utils.init_agents import initialize_agents
 from pipeline import build_pipeline
 from core.world import WorldState
 from core.agents import AgentSystem

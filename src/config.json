@@ -9,9 +9,9 @@
 		"sugarm": [2, 3],
 		"vis": [20, 40] 
 	},
-	"grid_size": 100,
+	"grid_size": 300,
 	"map_file": "map1.txt",
-	"num_agents": 300, 
+	"num_agents": 1000, 
 	"pipeline_steps": [
 		"movement_cobb_douglas",
 		"eat_all",
