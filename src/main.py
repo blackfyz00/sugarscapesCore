@@ -1,22 +1,70 @@
+import argparse
 import json
+import sys
 import random as rand
+from pathlib import Path
+
+# Импорты из вашего проекта
 from utils.create_map import create_map
 from pipeline import build_pipeline
 from core.world import WorldState
 from core.agents import AgentSystem
-
-# Импортируем новые модули
 from utils.metrics import aggregate_metrics
 from utils.plotter import render_charts_from_data
 from utils.exporter import save_simulation_archive
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Sugarscapes Simulation Core")
+    parser.add_argument(
+        "--config", 
+        type=str, 
+        default=None,
+        help="Absolute or relative path to config.json"
+    )
+    parser.add_argument(
+        "--output", 
+        type=str, 
+        default="sim_data.zip",
+        help="Output path for the simulation archive (zip)"
+    )
+    return parser.parse_args()
+
+
+def load_config(config_path: str | None) -> dict:
+    """Загружает конфиг по явному пути или использует fallback-логику."""
+    if config_path:
+        path = Path(config_path)
+        if not path.exists():
+            print(f"❌ Ошибка: Конфиг не найден по пути: {path.resolve()}", file=sys.stderr)
+            sys.exit(1)
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    
+    # Fallback для обратной совместимости
+    fallback_paths = ["./config.json", "src/config.json"]
+    for fp in fallback_paths:
+        p = Path(fp)
+        if p.exists():
+            print(f"ℹ️ Используем конфиг по умолчанию: {p.resolve()}")
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+                
+    print("❌ Ошибка: config.json не найден ни по --config, ни в стандартных путях.", file=sys.stderr)
+    sys.exit(1)
+
+
 def main():
+    args = parse_args()
+    
     try:
-        with open("./config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-    except FileNotFoundError:
-        with open("src/config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
+        config = load_config(args.config)
+    except json.JSONDecodeError as e:
+        print(f"❌ Ошибка парсинга JSON конфига: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Неизвестная ошибка при загрузке конфига: {e}", file=sys.stderr)
+        sys.exit(1)
 
     seed = config.get("seed")
     if seed is not None:
@@ -26,10 +74,10 @@ def main():
     num_agents = config.get("num_agents", 60)
     grid_size = config.get("grid_size", 100)
     map_file = config.get("map_file", None)
+    
     world = create_map(grid_size, map_file)
-    
     steps = config.get("steps", 100)
-    
+
     # Инициализируем агентов через AgentSystem
     agents = AgentSystem(capacity=num_agents * 5)
     from classes import create_agent
@@ -47,65 +95,61 @@ def main():
                 next_agent_id += 1
                 placed = True
 
-    # Создаем пайплайн
     pipeline = build_pipeline(config)
-    
-    # Мета-данные для пайплайна
-    meta = {
-        "next_agent_id": next_agent_id
-    }
-    
+    meta = {"next_agent_id": next_agent_id}
     simulation_history = []
-    
+
     print(f"🏁 Старт: {num_agents} агентов, {steps} шагов (Seed: {seed})")
     print(f"⚙️ Шагов в пайплайне: {len(pipeline)}")
 
-    for step in range(1, steps + 1):
-        context = {
-            "step": step,
-            "world": world,  # Ссылка на WorldState (NumPy)
-            "agents": agents,  # Ссылка на AgentSystem (SoA NumPy)
-            "simulation_history": simulation_history,
-            "meta": meta,
-            "config": config, 
+    try:
+        for step in range(1, steps + 1):
+            context = {
+                "step": step,
+                "world": world,
+                "agents": agents,
+                "simulation_history": simulation_history,
+                "meta": meta,
+                "config": config,
+            }
+
+            for strategy in pipeline:
+                strategy(context)
+
+            next_agent_id = meta["next_agent_id"]
+
+            if step % 10 == 0:
+                alive_count = len(agents.get_alive_indices())
+                print(f"⏳ Шаг {step}. Живых агентов: {alive_count}")
+
+        print("📊 Обработка данных и генерация графиков...")
+        metrics_data, final_welfares = aggregate_metrics(simulation_history)
+        charts = render_charts_from_data(metrics_data, final_welfares)
+
+        metadata = {
+            "total_steps": len(simulation_history),
+            "grid_width": grid_size,
+            "grid_height": grid_size,
+            "seed": seed
         }
 
-        # Выполняем пайплайн полностью на векторизованных структурах без словарей в горячем цикле
-        for strategy in pipeline:
-            strategy(context)
-
-        # Обновляем ID
-        next_agent_id = meta["next_agent_id"]
+        output_path = save_simulation_archive(
+            history=simulation_history,
+            charts=charts,
+            metadata=metadata,
+            filename=args.output,
+            world=world
+        )
         
-        if step % 10 == 0:
-            alive_count = len(agents.get_alive_indices())
-            print(f"⏳ Шаг {step}. Живых агентов: {alive_count}")
+        print(f"✅ Симуляция успешно завершена. Архив сохранен: {Path(output_path).resolve()}")
+        sys.exit(0)
 
-    # --- БЛОК АНАЛИТИКИ И ЭКСПОРТА ---
-    print("📊 Обработка данных и генерация графиков...")
-    
-    # 1. Агрегируем метрики из истории
-    metrics_data, final_welfares = aggregate_metrics(simulation_history)
-    
-    # 2. Рисуем графики по полученным данным
-    charts = render_charts_from_data(metrics_data, final_welfares)
-    
-    # 3. Формируем метаданные
-    metadata = {
-        "total_steps": len(simulation_history),
-        "grid_width": grid_size,
-        "grid_height": grid_size,
-        "seed": seed
-    }
-    
-    # 4. Сохраняем всё в архив с бинарными .npy картами для Godot
-    output_path = save_simulation_archive(
-        history=simulation_history, 
-        charts=charts, 
-        metadata=metadata, 
-        filename="sim_data.zip",
-        world=world
-    )
-    
+    except Exception as e:
+        print(f"❌ Критическая ошибка во время симуляции: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()
