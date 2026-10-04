@@ -4,6 +4,10 @@ import sys
 import random as rand
 from pathlib import Path
 
+script_dir = Path(__file__).parent.resolve()
+if str(script_dir) not in sys.path:
+    sys.path.insert(0, str(script_dir))
+    
 # Импорты из вашего проекта
 from utils.create_map import create_map
 from pipeline import build_pipeline
