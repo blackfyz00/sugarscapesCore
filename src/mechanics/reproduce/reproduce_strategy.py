@@ -5,14 +5,13 @@ from classes import create_agent
 
 @register_strategy("reproduction")
 def reproduction_strategy(ctx, params=None):
-    """Векторизованная стратегия размножения с использованием AgentSystem и WorldState"""
+    """Оптимизированная стратегия размножения"""
     if not params:
         return
         
     world = ctx.get("world")
     agents = ctx.get("agents")
     meta = ctx.get("meta")
-    config = ctx.get("config")
     
     if world is not None and agents is not None:
         current_id = meta.get("next_agent_id", 1)
@@ -22,27 +21,29 @@ def reproduction_strategy(ctx, params=None):
             
         min_res = params.get("minimal_resources", 20)
         prob = params.get("probability", 1.0)
-        if isinstance(prob, list):
-            prob = prob[0]
+        if isinstance(prob, list): prob = prob[0]
             
         max_child = params.get("max_child", 5)
-        if isinstance(max_child, list):
-            max_child = max_child[0]
+        if isinstance(max_child, list): max_child = max_child[0]
 
-        # Фильтруем родителей по ресурсам и лимиту детей
-        valid_parents = alive[
+        # 1. Быстрый маппинг ID -> Индекс массива (O(1) поиск вместо O(N))
+        id_to_idx = {int(agents.id[i]): i for i in alive}
+
+        # 2. Фильтрация родителей
+        valid_parents_mask = (
             (agents.sugar[alive] >= min_res) & 
             (agents.spicy[alive] >= min_res) & 
             (agents.children_count[alive] < max_child)
-        ]
+        )
+        valid_parents = alive[valid_parents_mask]
         
         if len(valid_parents) < 2:
             return
             
-        # Проходим по валидным родителям и ищем соседей для размножения
         reproduced = set()
         occupancy = world.occupancy
         size = world.size
+        directions = [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]
         
         for idx in valid_parents:
             if idx in reproduced:
@@ -52,63 +53,70 @@ def reproduction_strategy(ctx, params=None):
                 
             x, y = int(agents.x[idx]), int(agents.y[idx])
             
-            # Ищем свободного соседа в радиусе 1
             found_neighbor = False
-            for dx, dy in [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]:
+            for dx, dy in directions:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < size and 0 <= ny < size:
                     neighbor_aid = occupancy[ny, nx]
-                    if neighbor_aid != -1:
-                        n_indices = np.where(agents.id == neighbor_aid)[0]
-                        if len(n_indices) > 0:
-                            n_idx = n_indices[0]
-                            if n_idx not in reproduced and agents.children_count[n_idx] < max_child:
-                                if agents.sugar[n_idx] >= min_res and agents.spicy[n_idx] >= min_res:
-                                    # Находим свободную клетку рядом для ребенка
-                                    empty_spots = []
-                                    for edx, edy in [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]:
-                                        ex, ey = x + edx, y + edy
-                                        if 0 <= ex < size and 0 <= ey < size and occupancy[ey, ex] == -1:
-                                            empty_spots.append((ex, ey))
-                                    if not empty_spots:
-                                        for edx, edy in [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]:
-                                            ex, ey = int(agents.x[n_idx]) + edx, int(agents.y[n_idx]) + edy
-                                            if 0 <= ex < size and 0 <= ey < size and occupancy[ey, ex] == -1:
-                                                empty_spots.append((ex, ey))
-                                                
-                                    if empty_spots:
-                                        ex, ey = rand.choice(empty_spots)
+                    
+                    # Пропускаем пустые клетки и самого себя
+                    if neighbor_aid == -1 or neighbor_aid == int(agents.id[idx]):
+                        continue
+                    
+                    # БЫСТРЫЙ ПОИСК СОСЕДА
+                    n_idx = id_to_idx.get(neighbor_aid)
+                    
+                    # Проверяем: сосед существует, жив, не участвовал в размножении и имеет ресурсы
+                    if n_idx is not None and n_idx not in reproduced:
+                        if (agents.children_count[n_idx] < max_child and
+                            agents.sugar[n_idx] >= min_res and 
+                            agents.spicy[n_idx] >= min_res):
+                            
+                            # Ищем свободное место для ребенка (вокруг родителя или соседа)
+                            empty_spots = []
+                            # Проверяем 16 клеток (8 вокруг родителя + 8 вокруг соседа)
+                            candidates = [(x, y), (nx, ny)]
+                            for cx, cy in candidates:
+                                for edx, edy in directions:
+                                    ex, ey = cx + edx, cy + edy
+                                    if 0 <= ex < size and 0 <= ey < size and occupancy[ey, ex] == -1:
+                                        empty_spots.append((ex, ey))
                                         
-                                        # Снимаем ресурсы
-                                        cost_s_1 = agents.sugar[idx] * 0.2
-                                        cost_sp_1 = agents.spicy[idx] * 0.2
-                                        cost_s_2 = agents.sugar[n_idx] * 0.2
-                                        cost_sp_2 = agents.spicy[n_idx] * 0.2
-                                        
-                                        agents.sugar[idx] -= cost_s_1
-                                        agents.spicy[idx] -= cost_sp_1
-                                        agents.sugar[n_idx] -= cost_s_2
-                                        agents.spicy[n_idx] -= cost_sp_2
-                                        
-                                        child_data = {
-                                            "sugar": cost_s_1 + cost_s_2,
-                                            "spicy": cost_sp_1 + cost_sp_2,
-                                            "vis": int((agents.vis[idx] + agents.vis[n_idx]) / 2),
-                                            "max_age": int((agents.max_age[idx] + agents.max_age[n_idx]) / 2),
-                                            "age": 0
-                                        }
-                                        
-                                        new_idx = agents.spawn(current_id, ex, ey, child_data)
-                                        occupancy[ey, ex] = current_id
-                                        
-                                        agents.children_count[idx] += 1
-                                        agents.children_count[n_idx] += 1
-                                        
-                                        reproduced.add(idx)
-                                        reproduced.add(n_idx)
-                                        current_id += 1
-                                        found_neighbor = True
-                                        break
+                            if empty_spots:
+                                ex, ey = rand.choice(empty_spots)
+                                
+                                # Расчет стоимости
+                                cost_s_1 = agents.sugar[idx] * 0.2
+                                cost_sp_1 = agents.spicy[idx] * 0.2
+                                cost_s_2 = agents.sugar[n_idx] * 0.2
+                                cost_sp_2 = agents.spicy[n_idx] * 0.2
+                                
+                                # Списание ресурсов
+                                agents.sugar[idx] -= cost_s_1
+                                agents.spicy[idx] -= cost_sp_1
+                                agents.sugar[n_idx] -= cost_s_2
+                                agents.spicy[n_idx] -= cost_sp_2
+                                
+                                child_data = {
+                                    "sugar": cost_s_1 + cost_s_2,
+                                    "spicy": cost_sp_1 + cost_sp_2,
+                                    "vis": int((agents.vis[idx] + agents.vis[n_idx]) / 2),
+                                    "max_age": int((agents.max_age[idx] + agents.max_age[n_idx]) / 2),
+                                    "age": 0,
+                                    "children_count": 0
+                                }
+                                
+                                new_idx = agents.spawn(current_id, ex, ey, child_data)
+                                occupancy[ey, ex] = current_id
+                                
+                                agents.children_count[idx] += 1
+                                agents.children_count[n_idx] += 1
+                                
+                                reproduced.add(idx)
+                                reproduced.add(n_idx)
+                                current_id += 1
+                                found_neighbor = True
+                                break
             if found_neighbor:
                 continue
                 
