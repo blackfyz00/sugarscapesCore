@@ -17,6 +17,13 @@ from utils.metrics import aggregate_metrics
 from utils.plotter import render_charts_from_data
 from utils.exporter import save_simulation_archive
 
+if sys.platform == "win32":
+    # Принудительно переключаем stdout/stderr на UTF-8
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+    # Устанавливаем переменную окружения для Python
+    import os
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Sugarscapes Simulation Core")
