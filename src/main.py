@@ -90,7 +90,7 @@ def main():
     steps = config.get("steps", 100)
 
     # Инициализируем агентов через AgentSystem
-    agents = AgentSystem(capacity=num_agents * 25)
+    agents = AgentSystem(capacity=max(5000, num_agents * 20))
     from classes import create_agent
     
     next_agent_id = 1
