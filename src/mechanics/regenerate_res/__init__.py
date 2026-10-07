@@ -1,1 +1,1 @@
-from .regenerate_resources_strategy import regeneration_strategy
+from .regenerate_resources import regenerate_resources_strategy

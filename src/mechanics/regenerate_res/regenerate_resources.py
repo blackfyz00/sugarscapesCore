@@ -2,7 +2,7 @@ from registry import register_strategy
 import numpy as np
 
 @register_strategy("regeneration_map")
-def regeneration_map_strategy(ctx, params=None):
+def regenerate_resources_strategy(ctx, params=None):
     """Стратегия регенерации ресурсов"""
     if params is None:
         params = {}
