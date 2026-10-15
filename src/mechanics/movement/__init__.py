@@ -1,0 +1,1 @@
+from .move_cobb_strategy import movement_strategy

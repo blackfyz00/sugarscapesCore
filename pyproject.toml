@@ -1,0 +1,20 @@
+[project]
+name = "civ"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Заславский Ярослав", email = "blackfyz@yandex.ru" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=1.26.0",
+    "matplotlib>=3.8.0",
+    "scipy>=1.11.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pyinstaller>=6.11.1",
+]
