@@ -1,14 +1,16 @@
 # src/mechanics/trade/trade.py
 import numpy as np
 
-def trade_vectorized(world, agents) -> dict:
+def trade_vectorized(world, agents) -> list[dict]:
     """
-    Векторизованная торговля с защитой от NaN и проверкой ресурсов.
+    Векторизованная торговля.
+    Возвращает список сделок вида: 
+    [{"seller_id": int, "buyer_id": int, "sugar_qty": float, "spice_qty": float}, ...]
     """
-    trade_details = {}
+    trades = []
     alive = agents.get_alive_indices()
     if len(alive) < 2:
-        return trade_details
+        return trades
         
     id_to_idx = {int(agents.id[i]): i for i in alive}
     
@@ -18,7 +20,6 @@ def trade_vectorized(world, agents) -> dict:
     occupancy = world.occupancy
     size = world.size
     
-    # Используем все 8 направлений для честности, как в размножении
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
     traded_set = set()
     
@@ -34,7 +35,6 @@ def trade_vectorized(world, agents) -> dict:
             if 0 <= nx < size and 0 <= ny < size:
                 neighbor_aid = occupancy[ny, nx]
                 
-                # Проверка: клетка занята, это не мы, и партнер еще не торговал
                 if neighbor_aid != -1 and neighbor_aid != aid and neighbor_aid not in traded_set:
                     n_idx = id_to_idx.get(neighbor_aid)
                     if n_idx is None:
@@ -43,16 +43,12 @@ def trade_vectorized(world, agents) -> dict:
                     s_a, sp_a = agents.sugar[idx], agents.spicy[idx]
                     s_b, sp_b = agents.sugar[n_idx], agents.spicy[n_idx]
                     
-                    # Строгая проверка на положительность ресурсов
                     if s_a <= 0 or sp_a <= 0 or s_b <= 0 or sp_b <= 0:
                         continue
                         
-                    # Расчет MRS (Marginal Rate of Substitution)
-                    # Защита от деления на ноль уже обеспечена проверкой выше, 
-                    # но добавим защиту от NaN/Inf на всякий случай
                     try:
                         mrs_a = (sp_a * agents.sugarm[idx]) / (s_a * agents.spicym[idx])
-                        mrs_b = (sp_b * agents.sugarm[n_idx]) / (s_b * agents.spicym[n_idx])
+                        mrs_b = (sp_b * agents.sugarm[n_idx]) / (s_b * agents.spicym[idx])
                         
                         if not (np.isfinite(mrs_a) and np.isfinite(mrs_b)):
                             continue
@@ -70,14 +66,12 @@ def trade_vectorized(world, agents) -> dict:
                         buyer_idx, seller_idx = n_idx, idx
                         buyer_id, seller_id = neighbor_aid, aid
                         
-                    # Цена сделки (геометрическое среднее MRS)
                     price = np.sqrt(abs(mrs_a * mrs_b))
-                    amount_sugar = 1
-                    amount_spicy = max(1, int(np.round(price)))
+                    amount_sugar = 1.0 # Используем float для точности
+                    amount_spicy = max(1.0, float(np.round(price)))
                     
-                    # Проверка возможности сделки
                     if agents.sugar[seller_idx] >= amount_sugar and agents.spicy[buyer_idx] >= amount_spicy:
-                        # Обновляем ресурсы
+                        # Обновление ресурсов
                         agents.sugar[seller_idx] -= amount_sugar
                         agents.spicy[seller_idx] += amount_spicy
                         agents.sugar[buyer_idx] += amount_sugar
@@ -88,15 +82,12 @@ def trade_vectorized(world, agents) -> dict:
                         traded_set.add(aid)
                         traded_set.add(neighbor_aid)
                         
-                        trade_text = f"Купил {amount_sugar} сах. за {amount_spicy} спец."
-                        
-                        trade_details[aid] = {
-                            "partner_id": neighbor_aid,
-                            "text": trade_text
-                        }
-                        trade_details[neighbor_aid] = {
-                            "partner_id": aid,
-                            "text": trade_text
-                        }
+                        # Фиксируем сделку
+                        trades.append({
+                            "seller_id": int(seller_id),
+                            "buyer_id": int(buyer_id),
+                            "sugar_qty": float(amount_sugar),
+                            "spice_qty": float(amount_spicy)
+                        })
                         break 
-    return trade_details
+    return trades
