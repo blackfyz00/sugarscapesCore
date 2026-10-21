@@ -8,20 +8,17 @@ script_dir = Path(__file__).parent.resolve()
 if str(script_dir) not in sys.path:
     sys.path.insert(0, str(script_dir))
     
-# Импорты из вашего проекта
 from utils.create_map import create_map
 from pipeline import build_pipeline
 from core.world import WorldState
 from core.agents import AgentSystem
 from utils.metrics import aggregate_metrics
-from utils.plotter import render_charts_from_data
 from utils.exporter import save_simulation_archive
+from utils.plotter import render_charts_from_data, generate_html_dashboard  
 
 if sys.platform == "win32":
-    # Принудительно переключаем stdout/stderr на UTF-8
     sys.stdout.reconfigure(encoding='utf-8')
     sys.stderr.reconfigure(encoding='utf-8')
-    # Устанавливаем переменную окружения для Python
     import os
     os.environ['PYTHONIOENCODING'] = 'utf-8'
 
@@ -80,7 +77,6 @@ def main():
     world = create_map(grid_size, map_file)
     steps = config.get("steps", 100)
 
-    # Инициализируем агентов через AgentSystem
     agents = AgentSystem(capacity=max(5000, num_agents * 20))
     from classes import create_agent
     
@@ -115,40 +111,33 @@ def main():
                 "config": config,
             }
 
-            # --- БЕЗОПАСНАЯ ДИАГНОСТИКА ПОЗИЦИЙ ---
-            # Получаем первых 3 живых индекса
             alive_indices = list(agents.get_alive_indices())[:3]
             
             pos_before = {}
             for idx in alive_indices:
-                # Пробуем разные способы доступа к агенту, чтобы не упасть
                 ag = None
                 if hasattr(agents, 'get_agent'):
                     ag = agents.get_agent(idx)
                 elif hasattr(agents, 'agents') and idx in agents.agents:
                     ag = agents.agents[idx]
-                elif hasattr(agents, '_data'): # Если данные лежат в словаре _data
+                elif hasattr(agents, '_data'):
                      ag = agents._data.get(idx)
                 
                 if ag:
-                    # Предполагаем, что у агента есть атрибуты x, y
                     px = getattr(ag, 'x', None)
                     py = getattr(ag, 'y', None)
                     if px is not None and py is not None:
                         pos_before[idx] = (px, py)
-            # ---------------------------------------
 
-            # ВЫПОЛНЯЕМ ПАЙПЛАЙН
             for strategy in pipeline:
                 try:
                     strategy(context)
                 except Exception as e:
                     print(f"❌ Ошибка в стратегии {type(strategy)} на шаге {step}: {e}", file=sys.stderr)
-                    raise e # Перебрасываем, чтобы остановить симуляцию
+                    raise e
 
             next_agent_id = meta["next_agent_id"]
 
-            # --- СРАВНЕНИЕ ПОСЛЕ ШАГА ---
             if step <= 5 or step % 20 == 0:
                 moved_any = False
                 log_lines = [f"Step {step}: "]
@@ -183,6 +172,7 @@ def main():
 
         print("📊 Обработка данных...")
         metrics_data, final_welfares = aggregate_metrics(simulation_history)
+        
         charts = render_charts_from_data(metrics_data, final_welfares)
 
         metadata = {
@@ -199,8 +189,20 @@ def main():
             filename=args.output,
             world=world
         )
-        
-        print(f"✅ Симуляция успешно завершена. Архив сохранен: {Path(output_path).resolve()}")
+        print(f"✅ Симуляция завершена. Архив сохранен: {Path(output_path).resolve()}")
+
+        try:
+            report_filename = Path(args.output).with_suffix('.html')
+            
+            dashboard_path = generate_html_dashboard(
+                metrics_data=metrics_data,
+                final_welfares=final_welfares,
+                output_path=str(report_filename)
+            )
+            print(f"🎨 Интерактивный отчет создан: {dashboard_path}")
+        except Exception as e:
+            print(f"⚠️ Ошибка при генерации HTML-отчета: {e}", file=sys.stderr)
+
         sys.exit(0)
 
     except Exception as e:

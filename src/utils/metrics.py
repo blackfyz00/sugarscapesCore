@@ -13,13 +13,14 @@ def calculate_gini(values: list) -> float:
 def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, set]:
     """
     Извлекает метрики из одного шага.
-    Данные о торгах берутся напрямую из step_data["raw_trades"].
+    Теперь использует МЕДИАНУ для благосостояния и возраста.
     """
     agents = step_data.get("agents", {})
     agent_list = list(agents.values()) if isinstance(agents, dict) else agents
     
     current_ids = {a["id"] for a in agent_list if "id" in a}
     
+    # Список благосостояний всех живых агентов
     welfares = [
         calculate_welfare_cobb_douglas(
             sugar=a.get("sugar", 0.0),
@@ -29,6 +30,8 @@ def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, se
         ) 
         for a in agent_list
     ]
+    
+    # Список возрастов всех живых агентов
     ages = [a.get("age", 0) for a in agent_list]
     
     sugar_map = step_data.get("sugar_map", [])
@@ -50,7 +53,6 @@ def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, se
             spice_amt = t.get("spice_qty", 0)
             
             if sugar_amt > 0:
-                # Цена сахара в специях
                 p = spice_amt / sugar_amt
                 prices.append(p)
         
@@ -59,13 +61,22 @@ def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, se
             if avg_sugar_price > 0:
                 avg_spice_price = 1.0 / avg_sugar_price
 
+    # --- НОВЫЙ РАСЧЕТ МЕДИАНЫ ---
+    median_welfare = float(np.median(welfares)) if welfares else 0.0
+    median_age = float(np.median(ages)) if ages else 0.0
+    
+    # Оставляем среднее только если нужно сравнить, но для графиков лучше медиана
+    # mean_welfare = float(np.mean(welfares)) if welfares else 0.0 
+
     metrics = {
         "step": step_data.get("step", 0),
         "count": len(agent_list),
         "sugar": s_sum,
         "spicy": sp_sum,
-        "avg_welfare": sum(welfares) / len(welfares) if welfares else 0,
-        "avg_age": sum(ages) / len(ages) if ages else 0,
+        # ЗАМЕНИЛИ avg_welfare НА median_welfare
+        "median_welfare": median_welfare, 
+        # ЗАМЕНИЛИ avg_age НА median_age
+        "median_age": median_age,         
         "gini": calculate_gini(welfares),
         "births": len(current_ids - prev_agent_ids),
         "deaths": len(prev_agent_ids - current_ids),
@@ -78,12 +89,19 @@ def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, se
 def aggregate_metrics(history: list[dict]) -> tuple[dict, list]:
     """
     Принимает полную историю шагов.
-    Теперь history содержит поле "raw_trades" в каждом элементе.
+    Обновленные ключи словаря результата.
     """
     result = {
-        "steps": [], "agent_counts": [], "total_sugar": [], "total_spicy": [],
-        "avg_welfare": [], "avg_age": [], "gini_coeffs": [], 
-        "births": [], "deaths": [],
+        "steps": [], 
+        "agent_counts": [], 
+        "total_sugar": [], 
+        "total_spicy": [],
+        # ОБНОВИЛИ КЛЮЧИ В РЕЗУЛЬТАТЕ
+        "median_welfare": [], 
+        "median_age": [],     
+        "gini_coeffs": [], 
+        "births": [], 
+        "deaths": [],
         "avg_sugar_prices": [],
         "avg_spice_prices": []
     }
@@ -92,15 +110,17 @@ def aggregate_metrics(history: list[dict]) -> tuple[dict, list]:
     final_welfares = []
 
     for i, step_data in enumerate(history):
-        # Вызываем без дополнительного аргумента trades, так как они теперь внутри step_data
         m, prev_ids = extract_step_metrics(step_data, prev_ids)
         
         result["steps"].append(m["step"])
         result["agent_counts"].append(m["count"])
         result["total_sugar"].append(m["sugar"])
         result["total_spicy"].append(m["spicy"])
-        result["avg_welfare"].append(m["avg_welfare"])
-        result["avg_age"].append(m["avg_age"])
+        
+        # ДОБАВЛЯЕМ НОВЫЕ ПОЛЯ
+        result["median_welfare"].append(m["median_welfare"])
+        result["median_age"].append(m["median_age"])
+        
         result["gini_coeffs"].append(m["gini"])
         result["births"].append(m["births"])
         result["deaths"].append(m["deaths"])

@@ -42,29 +42,49 @@ def collect_data_strategy(ctx, params=None):
         current_spicy_map = [[cell["spicy"] for cell in row] for row in grid]
         agent_list = list(agents_map.values())
     
-    # --- Сбор торговых данных ---
     raw_trades = ctx.pop("active_trades_raw", [])
     
-    # Обогащение агентов данными о партнере
-    partner_map = {}
+    # --- ФОРМИРОВАНИЕ ТЕКСТОВОГО ОПИСАНИЯ СДЕЛКИ ---
+    trade_info_map = {} # id -> text
+    
     for t in raw_trades:
-        partner_map[t["seller_id"]] = t["buyer_id"]
-        partner_map[t["buyer_id"]] = t["seller_id"]
+        seller_id = t["seller_id"]
+        buyer_id = t["buyer_id"]
+        sugar_qty = t["sugar_qty"]
+        spice_qty = t["spice_qty"]
         
+        # Для ПРОДАВЦА: Он продал сахар, купил специи
+        # Текст: "Продал X сахара за Y специй"
+        seller_text = f"📦 Продал {int(sugar_qty)} Сах. за {int(spice_qty)} Спец."
+        
+        # Для ПОКУПАТЕЛЯ: Он купил сахар, заплатил специями
+        # Текст: "Купил X сахара за Y специй"
+        buyer_text = f"💰 Купил {int(sugar_qty)} Сах. за {int(spice_qty)} Спец."
+        
+        trade_info_map[seller_id] = seller_text
+        trade_info_map[buyer_id] = buyer_text
+        
+    # Обогащаем список агентов
     for agent in agent_list:
         aid = agent.get("id")
-        if aid in partner_map:
-            agent["trade_partner_id"] = partner_map[aid]
+        if aid in trade_info_map:
+            agent["trade_text"] = trade_info_map[aid]
+            # Также сохраним partner_id для связи линий, если нужно
+            # Найдем партнера по списку trades
+            for t in raw_trades:
+                if t["seller_id"] == aid:
+                    agent["trade_partner_id"] = t["buyer_id"]
+                elif t["buyer_id"] == aid:
+                    agent["trade_partner_id"] = t["seller_id"]
 
     step_data = {
         "step": int(step),
         "sugar_map": current_sugar_map,
         "spicy_map": current_spicy_map,
-        "agents": agent_list,      # ✅ ВОЗВРАЩАЕМ АГЕНТОВ СЮДА ОБЯЗАТЕЛЬНО
-        "raw_trades": raw_trades   # ✅ И ТОРГИ ДЛЯ МЕТРИК
+        "agents": agent_list,      
+        "raw_trades": raw_trades   
     }
     ctx["simulation_history"].append(step_data)
-
 
 def build_pipeline(config: dict) -> list:
     system_steps = ["reset_flags", "collect_data"]
