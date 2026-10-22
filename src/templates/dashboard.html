@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sugarscape Analytics Dashboard</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              950: '#020617'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    body {
+      overflow-x: hidden;
+    }
+
+    .chart-container {
+      width: 100%;
+      height: 400px;
+    }
+
+    #chat-window {
+      max-height: calc(100vh - 6rem);
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 font-sans antialiased">
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <header class="flex justify-between items-center mb-8 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
+          Sugarscape Core
+        </h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          Интерактивный аналитический отчет
+        </p>
+      </div>
+
+      <button
+        id="theme-toggle"
+        class="p-2 rounded-lg bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-all focus:outline-none ring-2 ring-blue-500/20"
+      >
+        <span id="theme-icon">🌙</span>
+      </button>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <p class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+          Финальная популяция
+        </p>
+        <p id="kpi-agents" class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">
+          --
+        </p>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <p class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+          Медиана благосостояния
+        </p>
+        <p id="kpi-welfare" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
+          --
+        </p>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <p class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+          Коэффициент Джини
+        </p>
+        <p id="kpi-gini" class="text-2xl font-bold text-red-600 dark:text-red-400 mt-2">
+          --
+        </p>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <p class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+          Всего шагов
+        </p>
+        <p id="kpi-steps" class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">
+          --
+        </p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 col-span-1 lg:col-span-2">
+        <h3 class="text-lg font-semibold mb-4">Динамика популяции и демографии</h3>
+        <div id="chart-population" class="chart-container"></div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <h3 class="text-lg font-semibold mb-4">Общие ресурсы (Сахар/Специи)</h3>
+        <div id="chart-resources" class="chart-container"></div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <h3 class="text-lg font-semibold mb-4">Благосостояние и Неравенство</h3>
+        <div id="chart-welfare" class="chart-container"></div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <h3 class="text-lg font-semibold mb-4">Рыночные цены (Exchange Rates)</h3>
+        <div id="chart-prices" class="chart-container"></div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <h3 class="text-lg font-semibold mb-4">Распределение богатства (Final Step)</h3>
+        <div id="chart-distribution" class="chart-container"></div>
+      </div>
+    </div>
+
+    <footer class="mt-12 text-center text-xs text-slate-400 dark:text-slate-600">
+      Generated by Simulation Core • Powered by Plotly & Tailwind
+    </footer>
+  </div>
+
+  <!-- AI CHAT WIDGET START -->
+  <div id="ai-chat-widget" class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    <div
+      id="chat-window"
+      class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl w-80 h-96 flex flex-col overflow-hidden"
+    >
+      <div
+        class="p-3 bg-gradient-to-r from-blue-600 to-emerald-500 text-white font-semibold flex justify-between items-center cursor-pointer select-none"
+        onclick="toggleChat()"
+      >
+        <span class="flex items-center gap-2">
+          <span id="ws-status" class="inline-block w-2 h-2 rounded-full bg-yellow-400"></span>
+          🤖 AI Аналитик
+        </span>
+
+        <button
+          class="hover:bg-white/20 rounded p-1"
+          onclick="event.stopPropagation(); toggleChat()"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div
+        id="chat-messages"
+        class="flex-1 overflow-y-auto p-3 space-y-2 text-sm bg-slate-50 dark:bg-slate-950"
+      >
+        <div id="chat-welcome" class="text-center text-slate-400 text-xs mt-10">
+          Задайте вопрос о симуляции...
+        </div>
+      </div>
+
+      <div class="p-2 border-t border-slate-200 dark:border-slate-700 flex gap-2 bg-white dark:bg-slate-900">
+        <input
+          type="text"
+          id="chat-input"
+          placeholder="Почему упала популяция?"
+          class="flex-1 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white placeholder-slate-400"
+          onkeydown="if(event.key === 'Enter') sendChat()"
+        >
+
+        <button
+          onclick="sendChat()"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-2 text-sm font-bold transition-colors"
+        >
+          ➤
+        </button>
+      </div>
+    </div>
+
+    <button
+      onclick="toggleChat()"
+      class="bg-gradient-to-r from-blue-600 to-emerald-500 text-white p-3 rounded-full shadow-lg hover:scale-110 transition-transform active:scale-95"
+    >
+      💬
+    </button>
+  </div>
+  <!-- AI CHAT WIDGET END -->
+
+  <script>
+    const rawData = {{DATA_JSON}};
+
+    const plotOptions = {
+      responsive: true,
+      displaylogo: false
+    };
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function toggleChat() {
+      const win = document.getElementById('chat-window');
+      if (!win) return;
+
+      if (win.classList.contains('hidden')) {
+        win.classList.remove('hidden');
+        setTimeout(() => {
+          const input = document.getElementById('chat-input');
+          if (input) input.focus();
+        }, 50);
+      } else {
+        win.classList.add('hidden');
+      }
+    }
+
+    function setWsStatus(status) {
+      const el = document.getElementById('ws-status');
+      if (!el) return;
+
+      if (status === 'open') {
+        el.className = 'inline-block w-2 h-2 rounded-full bg-emerald-400';
+        el.title = 'Подключено';
+      } else if (status === 'connecting') {
+        el.className = 'inline-block w-2 h-2 rounded-full bg-yellow-400';
+        el.title = 'Подключение...';
+      } else {
+        el.className = 'inline-block w-2 h-2 rounded-full bg-red-400';
+        el.title = 'Нет соединения';
+      }
+    }
+
+    function getWsUrl() {
+      const host = window.location.host || 'localhost:8000';
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return protocol + '//' + host + '/ws';
+    }
+
+    function addMessage(role, text) {
+      const messages = document.getElementById('chat-messages');
+      if (!messages) return null;
+
+      const welcome = document.getElementById('chat-welcome');
+      if (welcome) welcome.remove();
+
+      const wrap = document.createElement('div');
+
+      if (role === 'user') {
+        wrap.className = 'flex justify-end mb-2';
+      } else if (role === 'system') {
+        wrap.className = 'text-center mb-2';
+      } else {
+        wrap.className = 'flex justify-start mb-2';
+      }
+
+      const bubble = document.createElement('div');
+
+      if (role === 'user') {
+        bubble.className = 'bg-blue-600 text-white rounded-lg px-3 py-2 max-w-[80%] break-words';
+      } else if (role === 'system') {
+        bubble.className = 'text-xs text-slate-400';
+      } else {
+        bubble.className = 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 max-w-[80%] whitespace-pre-wrap break-words';
+      }
+
+      bubble.textContent = text;
+      wrap.appendChild(bubble);
+      messages.appendChild(wrap);
+      messages.scrollTop = messages.scrollHeight;
+
+      return bubble;
+    }
+
+    let ws = null;
+    let activeAiDiv = null;
+    let awaitingResponse = false;
+    let outbox = [];
+    let reconnectTimer = null;
+
+    function flushOutbox() {
+      if (!ws || ws.readyState !== WebSocket.OPEN || awaitingResponse) return;
+
+      const item = outbox.shift();
+      if (!item) return;
+
+      awaitingResponse = true;
+      activeAiDiv = item.aiDiv;
+      ws.send(item.payload);
+    }
+
+    function scheduleReconnect() {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(initWebSocket, 3000);
+    }
+
+    function initWebSocket() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
+      setWsStatus('connecting');
+
+      try {
+        ws = new WebSocket(getWsUrl());
+      } catch (e) {
+        setWsStatus('closed');
+        scheduleReconnect();
+        return;
+      }
+
+      ws.onopen = () => {
+        setWsStatus('open');
+        flushOutbox();
+      };
+
+      ws.onmessage = (event) => {
+        const data = event.data;
+
+        if (data === '[DONE]') {
+          if (activeAiDiv && activeAiDiv.textContent === '...') {
+            activeAiDiv.textContent = '';
+          }
+
+          awaitingResponse = false;
+          activeAiDiv = null;
+          flushOutbox();
+          return;
+        }
+
+        if (typeof data === 'string' && data.startsWith('[ERROR]')) {
+          if (activeAiDiv) {
+            activeAiDiv.textContent = data;
+          } else {
+            addMessage('system', data);
+          }
+
+          awaitingResponse = false;
+          activeAiDiv = null;
+          flushOutbox();
+          return;
+        }
+
+        if (!activeAiDiv) {
+          activeAiDiv = addMessage('ai', '');
+        }
+
+        if (activeAiDiv.textContent === '...') {
+          activeAiDiv.textContent = '';
+        }
+
+        activeAiDiv.textContent += data;
+
+        const messages = document.getElementById('chat-messages');
+        if (messages) {
+          messages.scrollTop = messages.scrollHeight;
+        }
+      };
+
+      ws.onclose = () => {
+        setWsStatus('closed');
+        awaitingResponse = false;
+        activeAiDiv = null;
+        scheduleReconnect();
+      };
+
+      ws.onerror = () => {
+        try {
+          ws.close();
+        } catch (e) {}
+      };
+    }
+
+    function sendChat() {
+      const input = document.getElementById('chat-input');
+      if (!input) return;
+
+      const message = input.value.trim();
+      if (!message) return;
+
+      addMessage('user', message);
+      input.value = '';
+
+      const aiDiv = addMessage('ai', '...');
+      const payload = JSON.stringify({ message: message });
+
+      outbox.push({ payload, aiDiv });
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        flushOutbox();
+      } else {
+        initWebSocket();
+      }
+    }
+
+    function getBaseLayout(title) {
+      return {
+        title: {
+          text: title,
+          font: { size: 16 }
+        },
+        margin: { l: 50, r: 20, t: 40, b: 40 },
+        showlegend: true,
+        legend: {
+          orientation: 'h',
+          y: -0.2
+        },
+        autosize: true
+      };
+    }
+
+    function updateKpis() {
+      const agents = rawData.agents || [];
+      const welfare = rawData.welfare || [];
+      const gini = rawData.gini || [];
+      const steps = rawData.steps || [];
+
+      setText('kpi-agents', agents.length ? agents[agents.length - 1] : 0);
+
+      const lastWelfare = welfare.length ? Number(welfare[welfare.length - 1]) : 0;
+      setText('kpi-welfare', Number.isFinite(lastWelfare) ? lastWelfare.toFixed(2) : '--');
+
+      const lastGini = gini.length ? Number(gini[gini.length - 1]) : 0;
+      setText('kpi-gini', Number.isFinite(lastGini) ? lastGini.toFixed(3) : '--');
+
+      setText('kpi-steps', steps.length);
+    }
+
+    function renderPopulationChart() {
+      const steps = rawData.steps || [];
+      const agents = rawData.agents || [];
+      const births = rawData.births || [];
+      const deaths = rawData.deaths || [];
+
+      const traces = [
+        {
+          x: steps,
+          y: agents,
+          type: 'scatter',
+          mode: 'lines+markers',
+          name: 'Популяция',
+          line: { color: '#3b82f6', width: 2 },
+          marker: { size: 4 }
+        }
+      ];
+
+      if (births.length) {
+        traces.push({
+          x: steps,
+          y: births,
+          type: 'bar',
+          name: 'Рождения',
+          marker: { color: 'rgba(16, 185, 129, 0.6)' }
+        });
+      }
+
+      if (deaths.length) {
+        traces.push({
+          x: steps,
+          y: deaths.map(d => -d),
+          type: 'bar',
+          name: 'Смерти',
+          marker: { color: 'rgba(239, 68, 68, 0.6)' }
+        });
+      }
+
+      const layout = getBaseLayout('Динамика популяции');
+      layout.barmode = 'overlay';
+      layout.yaxis = { title: 'Количество агентов' };
+
+      if (births.length || deaths.length) {
+        layout.yaxis2 = {
+          title: 'Естественное движение',
+          overlaying: 'y',
+          side: 'right',
+          rangemode: 'tozero'
+        };
+      }
+
+      Plotly.newPlot('chart-population', traces, layout, plotOptions);
+    }
+
+    function renderResourcesChart() {
+      const steps = rawData.steps || [];
+      const sugar = rawData.sugar || [];
+      const spicy = rawData.spicy || [];
+
+      const traceSugar = {
+        x: steps,
+        y: sugar,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Сахар',
+        line: { color: '#f59e0b', width: 2 }
+      };
+
+      const traceSpicy = {
+        x: steps,
+        y: spicy,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Специи',
+        line: { color: '#ef4444', width: 2 }
+      };
+
+      Plotly.newPlot('chart-resources', [traceSugar, traceSpicy], getBaseLayout('Запасы ресурсов'), plotOptions);
+    }
+
+    function renderWelfareChart() {
+      const steps = rawData.steps || [];
+      const welfare = rawData.welfare || [];
+      const gini = rawData.gini || [];
+
+      const traceWelfare = {
+        x: steps,
+        y: welfare,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Медиана благосостояния',
+        line: { color: '#10b981', width: 2 }
+      };
+
+      const traceGini = {
+        x: steps,
+        y: gini,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Коэфф. Джини',
+        line: { color: '#8b5cf6', dash: 'dashdot', width: 2 },
+        yaxis: 'y2'
+      };
+
+      const layout = getBaseLayout('Благосостояние и Неравенство');
+
+      const maxWelfare = welfare.length > 0 ? Math.max(...welfare) : 100;
+
+      layout.yaxis = {
+        title: 'Уровень жизни',
+        range: [0, maxWelfare * 1.1]
+      };
+
+      layout.yaxis2 = {
+        title: 'Неравенство (0-1)',
+        overlaying: 'y',
+        side: 'right',
+        range: [0, 1]
+      };
+
+      Plotly.newPlot('chart-welfare', [traceWelfare, traceGini], layout, plotOptions);
+    }
+
+    function renderPricesChart() {
+      const steps = rawData.steps || [];
+      const sugarPrices = rawData.price_sugar || [];
+      const spicePrices = rawData.price_spice || [];
+
+      const validIndices = sugarPrices
+        .map((v, i) => v > 0 ? i : null)
+        .filter(i => i !== null);
+
+      if (validIndices.length === 0) {
+        const el = document.getElementById('chart-prices');
+        if (el) {
+          el.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400">Нет данных о торгах</div>';
+        }
+        return;
+      }
+
+      const filteredSteps = validIndices.map(i => steps[i]);
+      const filteredSugarP = validIndices.map(i => sugarPrices[i]);
+      const filteredSpiceP = validIndices.map(i => spicePrices[i]);
+
+      const traceSugarPrice = {
+        x: filteredSteps,
+        y: filteredSugarP,
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Цена Сахара (в Специях)',
+        line: { color: '#f59e0b', width: 2 },
+        marker: { size: 6 }
+      };
+
+      const traceSpicePrice = {
+        x: filteredSteps,
+        y: filteredSpiceP,
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Цена Специй (в Сахаре)',
+        line: { color: '#ef4444', width: 2, dash: 'dot' },
+        marker: { size: 6 }
+      };
+
+      Plotly.newPlot('chart-prices', [traceSugarPrice, traceSpicePrice], getBaseLayout('Обменные курсы'), plotOptions);
+    }
+
+    function renderDistributionChart() {
+        const dist = rawData.final_wealth_dist || [];
+
+        if (!dist || dist.length === 0) {
+            const el = document.getElementById('chart-distribution');
+            if (el) {
+                el.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400">Нет данных</div>';
+            }
+            return;
+        }
+
+        const traceHist = {
+            x: dist,
+            type: 'histogram',
+            histnorm: 'probability density',
+            marker: { color: '#3b82f6', opacity: 0.7 },
+            nbinsx: 30
+        };
+
+        // ИСПРАВЛЕНО: Явное создание объектов осей перед присваиванием title
+        const layout = getBaseLayout('Гистограмма распределения благосостояния');
+        
+        // Гарантируем существование объектов
+        layout.xaxis = layout.xaxis || {};
+        layout.yaxis = layout.yaxis || {};
+
+        layout.xaxis.title = 'Уровень благосостояния';
+        layout.yaxis.title = 'Плотность вероятности';
+        layout.showlegend = false;
+
+        Plotly.newPlot('chart-distribution', [traceHist], layout, plotOptions);
+    }
+
+    function updateChartsTheme() {
+      const isDark = document.documentElement.classList.contains('dark');
+
+      const layoutUpdates = {
+        paper_bgcolor: isDark ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0)',
+        plot_bgcolor: isDark ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0)',
+        'font.color': isDark ? '#e2e8f0' : '#1e293b',
+        'xaxis.gridcolor': isDark ? '#334155' : '#cbd5e1',
+        'yaxis.gridcolor': isDark ? '#334155' : '#cbd5e1',
+        'yaxis2.gridcolor': isDark ? '#334155' : '#cbd5e1'
+      };
+
+      const chartIds = [
+        'chart-population',
+        'chart-resources',
+        'chart-welfare',
+        'chart-prices',
+        'chart-distribution'
+      ];
+
+      chartIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.data) {
+          try {
+            Plotly.relayout(id, layoutUpdates);
+          } catch (e) {}
+        }
+      });
+    }
+
+    function initThemeToggle() {
+      const toggleBtn = document.getElementById('theme-toggle');
+      const iconSpan = document.getElementById('theme-icon');
+      const htmlEl = document.documentElement;
+
+      if (!toggleBtn || !iconSpan || !htmlEl) return;
+
+      toggleBtn.addEventListener('click', () => {
+        const isDark = htmlEl.classList.toggle('dark');
+        iconSpan.textContent = isDark ? '🌙' : '☀️';
+        updateChartsTheme();
+      });
+    }
+
+    function initDashboard() {
+      updateKpis();
+
+      renderPopulationChart();
+      renderResourcesChart();
+      renderWelfareChart();
+      renderPricesChart();
+      renderDistributionChart();
+
+      updateChartsTheme();
+      initThemeToggle();
+      initWebSocket();
+    }
+
+    document.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>

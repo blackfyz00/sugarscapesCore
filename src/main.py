@@ -203,6 +203,40 @@ def main():
         except Exception as e:
             print(f"⚠️ Ошибка при генерации HTML-отчета: {e}", file=sys.stderr)
 
+        # === НОВЫЙ БЛОК: Сохранение контекста для AI-сервера ===
+        try:
+            # Импортируем здесь, чтобы поймать ImportError явно
+            from utils.ai_context import build_ai_context 
+            
+            ai_json_path = Path(args.output).with_suffix('.ai.json')
+            
+            # Формируем структуру данных для сервера
+            ai_payload = {
+                "config": config,
+                # Собираем сводки по всем шагам
+                "summaries": [build_ai_context(step_data) for step_data in simulation_history],
+                # Быстрые метрики для анализа трендов
+                "trend": [
+                    {
+                        "step": s["step"], 
+                        "pop": len(s.get("agents", [])),
+                        "trades": len(s.get("raw_trades", []))
+                    } 
+                    for s in simulation_history
+                ]
+            }
+            
+            with open(ai_json_path, "w", encoding="utf-8") as f:
+                json.dump(ai_payload, f, ensure_ascii=False, indent=2)
+                
+            print(f"🧠 AI Context saved to: {ai_json_path.resolve()}")
+            
+        except Exception as e:
+            print(f"❌ КРИТИЧЕСКАЯ ошибка при сохранении AI-контекста: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+            sys.exit(1) 
+        
         sys.exit(0)
 
     except Exception as e:

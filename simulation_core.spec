@@ -2,6 +2,7 @@ from PyInstaller.utils.hooks import collect_submodules
 
 datas = [
     ('src/maps', 'maps'), 
+    ('src/templates', 'templates'),
 ]
 
 binaries = []

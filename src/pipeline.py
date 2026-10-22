@@ -3,6 +3,7 @@ import copy
 import numpy as np  
 from functools import partial
 from registry import register_strategy, REGISTRY, load_mechanic, MODULE_MAPPING
+from utils.ai_context import build_ai_context
 
 @register_strategy("reset_flags")
 def reset_flags_strategy(ctx, params=None):
@@ -84,6 +85,8 @@ def collect_data_strategy(ctx, params=None):
         "agents": agent_list,      
         "raw_trades": raw_trades   
     }
+    ai_summary = build_ai_context(step_data)
+    step_data["ai_summary"] = ai_summary
     ctx["simulation_history"].append(step_data)
 
 def build_pipeline(config: dict) -> list:
