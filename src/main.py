@@ -3,6 +3,24 @@ import json
 import sys
 import random as rand
 from pathlib import Path
+import os
+
+# --- 1. ИСПРАВЛЕНИЕ КОДИРОВКИ КОНСОЛИ WINDOWS (CRITICAL FIX) ---
+if sys.platform == "win32":
+    # Меняем кодовую страницу CMD на UTF-8 (65001) ПРЯМО В СИСТЕМЕ
+    # Это должно быть первой командой, влияющей на ввод-вывод
+    os.system('chcp 65001 > nul')
+    
+    # Теперь перенастраиваем стандартные потоки Python на UTF-8
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+        
+    # Устанавливаем переменную окружения для дочерних процессов (если они есть)
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+# ----------------------------------------------------------------
 
 script_dir = Path(__file__).parent.resolve()
 if str(script_dir) not in sys.path:
@@ -16,38 +34,20 @@ from utils.metrics import aggregate_metrics
 from utils.exporter import save_simulation_archive
 from utils.plotter import render_charts_from_data, generate_html_dashboard  
 
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
-    sys.stderr.reconfigure(encoding='utf-8')
-    import os
-    os.environ['PYTHONIOENCODING'] = 'utf-8'
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Sugarscapes Simulation Core")
-    parser.add_argument(
-        "--config", 
-        type=str, 
-        default=None,
-        help="Absolute or relative path to config.json"
-    )
-    parser.add_argument(
-        "--output", 
-        type=str, 
-        default="sim_data.zip",
-        help="Output path for the simulation archive (zip)"
-    )
+    parser.add_argument("--config", type=str, default=None, help="Absolute or relative path to config.json")
+    parser.add_argument("--output", type=str, default="sim_data.zip", help="Output path for the simulation archive (zip)")
     return parser.parse_args()
 
-
 def load_config(config_path: str | None) -> dict:
-    """Загружает конфиг ТОЛЬКО по явному пути."""
     if not config_path:
-        print("❌ Критическая ошибка: Аргумент --config обязателен при запуске из EXE.", file=sys.stderr)
+        print("❌ Critical Error: --config argument is mandatory when running from EXE.", file=sys.stderr)
         sys.exit(1)
     
     path = Path(config_path)
     if not path.exists():
-        print(f"❌ Ошибка: Конфиг не найден по указанному пути: {path.resolve()}", file=sys.stderr)
+        print(f"❌ Error: Config not found at specified path: {path.resolve()}", file=sys.stderr)
         sys.exit(1)
         
     with open(path, "r", encoding="utf-8") as f:
@@ -59,17 +59,17 @@ def main():
     try:
         config = load_config(args.config)
     except json.JSONDecodeError as e:
-        print(f"❌ Ошибка парсинга JSON конфига: {e}", file=sys.stderr)
+        print(f"❌ JSON Parsing Error in config: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Неизвестная ошибка при загрузке конфига: {e}", file=sys.stderr)
+        print(f"❌ Unknown error loading config: {e}", file=sys.stderr)
         sys.exit(1)
 
     seed = config.get("seed")
     if seed is not None:
         rand.seed(seed)
 
-    print("🌍 Инициализация мира...")
+    print("🌍 Initializing world...")
     num_agents = config.get("num_agents", 60)
     grid_size = config.get("grid_size", 100)
     map_file = config.get("map_file", None)
@@ -77,7 +77,10 @@ def main():
     world = create_map(grid_size, map_file)
     steps = config.get("steps", 100)
 
-    agents = AgentSystem(capacity=max(5000, num_agents * 20))
+    # ИСПРАВЛЕНИЕ CAPACITY: Увеличиваем лимит, чтобы избежать падения при взрывном росте
+    # Было: max(10000, num_agents * 20)
+    agents = AgentSystem(capacity=max(50000, num_agents * 50))
+    
     from classes import create_agent
     
     next_agent_id = 1
@@ -97,8 +100,8 @@ def main():
     meta = {"next_agent_id": next_agent_id}
     simulation_history = []
 
-    print(f"🏁 Старт: {num_agents} агентов, {steps} шагов (Seed: {seed})")
-    print(f"⚙️ Шагов в пайплайне: {len(pipeline)}")
+    print(f"🏁 Start: {num_agents} agents, {steps} steps (Seed: {seed})")
+    print(f"⚙️ Pipeline steps count: {len(pipeline)}")
 
     try:
         for step in range(1, steps + 1):
@@ -133,7 +136,8 @@ def main():
                 try:
                     strategy(context)
                 except Exception as e:
-                    print(f"❌ Ошибка в стратегии {type(strategy)} на шаге {step}: {e}", file=sys.stderr)
+                    # Теперь эта ошибка выведется нормально
+                    print(f"❌ Strategy error [{type(strategy).__name__}] at step {step}: {e}", file=sys.stderr)
                     raise e
 
             next_agent_id = meta["next_agent_id"]
@@ -164,13 +168,13 @@ def main():
                 print("".join(log_lines))
                 
                 if not moved_any and step == 1:
-                     print("⚠️ WARNING: Никто не двинулся на первом шаге!", file=sys.stderr)
+                     print("⚠️ WARNING: No one moved on the first step!", file=sys.stderr)
 
             if step % 10 == 0:
                 alive_count = len(agents.get_alive_indices())
-                print(f"⏳ Шаг {step}. Живых агентов: {alive_count}")
+                print(f"⏳ Step {step}. Alive agents: {alive_count}")
 
-        print("📊 Обработка данных...")
+        print("📊 Processing data...")
         metrics_data, final_welfares = aggregate_metrics(simulation_history)
         
         charts = render_charts_from_data(metrics_data, final_welfares)
@@ -189,7 +193,7 @@ def main():
             filename=args.output,
             world=world
         )
-        print(f"✅ Симуляция завершена. Архив сохранен: {Path(output_path).resolve()}")
+        print(f"✅ Simulation finished. Archive saved: {Path(output_path).resolve()}")
 
         try:
             report_filename = Path(args.output).with_suffix('.html')
@@ -199,23 +203,19 @@ def main():
                 final_welfares=final_welfares,
                 output_path=str(report_filename)
             )
-            print(f"🎨 Интерактивный отчет создан: {dashboard_path}")
+            print(f"🎨 Interactive report created: {dashboard_path}")
         except Exception as e:
-            print(f"⚠️ Ошибка при генерации HTML-отчета: {e}", file=sys.stderr)
+            print(f"⚠️ Error generating HTML report: {e}", file=sys.stderr)
 
-        # === НОВЫЙ БЛОК: Сохранение контекста для AI-сервера ===
+        # === AI CONTEXT SAVING ===
         try:
-            # Импортируем здесь, чтобы поймать ImportError явно
             from utils.ai_context import build_ai_context 
             
             ai_json_path = Path(args.output).with_suffix('.ai.json')
             
-            # Формируем структуру данных для сервера
             ai_payload = {
                 "config": config,
-                # Собираем сводки по всем шагам
                 "summaries": [build_ai_context(step_data) for step_data in simulation_history],
-                # Быстрые метрики для анализа трендов
                 "trend": [
                     {
                         "step": s["step"], 
@@ -232,7 +232,7 @@ def main():
             print(f"🧠 AI Context saved to: {ai_json_path.resolve()}")
             
         except Exception as e:
-            print(f"❌ КРИТИЧЕСКАЯ ошибка при сохранении AI-контекста: {e}", file=sys.stderr)
+            print(f"❌ CRITICAL ERROR saving AI context: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
             sys.exit(1) 
@@ -240,7 +240,7 @@ def main():
         sys.exit(0)
 
     except Exception as e:
-        print(f"❌ Критическая ошибка во время симуляции: {e}", file=sys.stderr)
+        print(f"❌ Critical simulation error: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         sys.exit(1)

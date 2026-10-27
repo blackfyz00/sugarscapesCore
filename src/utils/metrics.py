@@ -13,7 +13,7 @@ def calculate_gini(values: list) -> float:
 def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, set]:
     """
     Извлекает метрики из одного шага.
-    Теперь использует МЕДИАНУ для благосостояния и возраста.
+    Использует МЕДИАНУ для благосостояния/возраста и ВЗВЕШЕННУЮ СРЕДНЮЮ для цен.
     """
     agents = step_data.get("agents", {})
     agent_list = list(agents.values()) if isinstance(agents, dict) else agents
@@ -40,42 +40,39 @@ def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, se
     s_sum = sum(sum(row) for row in sugar_map) if sugar_map else 0
     sp_sum = sum(sum(row) for row in spicy_map) if spicy_map else 0
 
-    # --- РАСЧЕТ ЦЕН ИЗ СТРУКТУРИРОВАННЫХ ДАННЫХ ---
+    # --- РАСЧЕТ ВЗВЕШЕННОЙ СРЕДНЕЙ ЦЕНЫ (VWAP) ---
     avg_sugar_price = 0.0
     avg_spice_price = 0.0
+    
+    total_sugar_traded = 0.0
+    total_spice_paid = 0.0
     
     raw_trades = step_data.get("raw_trades", [])
     
     if raw_trades:
-        prices = []
         for t in raw_trades:
             sugar_amt = t.get("sugar_qty", 0)
             spice_amt = t.get("spice_qty", 0)
             
-            if sugar_amt > 0:
-                p = spice_amt / sugar_amt
-                prices.append(p)
+            total_sugar_traded += sugar_amt
+            total_spice_paid += spice_amt
         
-        if prices:
-            avg_sugar_price = sum(prices) / len(prices)
+        if total_sugar_traded > 0:
+            avg_sugar_price = total_spice_paid / total_sugar_traded
+            
             if avg_sugar_price > 0:
                 avg_spice_price = 1.0 / avg_sugar_price
 
-    # --- НОВЫЙ РАСЧЕТ МЕДИАНЫ ---
+    # --- РАСЧЕТ МЕДИАНЫ ---
     median_welfare = float(np.median(welfares)) if welfares else 0.0
     median_age = float(np.median(ages)) if ages else 0.0
-    
-    # Оставляем среднее только если нужно сравнить, но для графиков лучше медиана
-    # mean_welfare = float(np.mean(welfares)) if welfares else 0.0 
 
     metrics = {
         "step": step_data.get("step", 0),
         "count": len(agent_list),
         "sugar": s_sum,
         "spicy": sp_sum,
-        # ЗАМЕНИЛИ avg_welfare НА median_welfare
         "median_welfare": median_welfare, 
-        # ЗАМЕНИЛИ avg_age НА median_age
         "median_age": median_age,         
         "gini": calculate_gini(welfares),
         "births": len(current_ids - prev_agent_ids),
@@ -89,14 +86,12 @@ def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, se
 def aggregate_metrics(history: list[dict]) -> tuple[dict, list]:
     """
     Принимает полную историю шагов.
-    Обновленные ключи словаря результата.
     """
     result = {
         "steps": [], 
         "agent_counts": [], 
         "total_sugar": [], 
         "total_spicy": [],
-        # ОБНОВИЛИ КЛЮЧИ В РЕЗУЛЬТАТЕ
         "median_welfare": [], 
         "median_age": [],     
         "gini_coeffs": [], 
@@ -117,7 +112,6 @@ def aggregate_metrics(history: list[dict]) -> tuple[dict, list]:
         result["total_sugar"].append(m["sugar"])
         result["total_spicy"].append(m["spicy"])
         
-        # ДОБАВЛЯЕМ НОВЫЕ ПОЛЯ
         result["median_welfare"].append(m["median_welfare"])
         result["median_age"].append(m["median_age"])
         

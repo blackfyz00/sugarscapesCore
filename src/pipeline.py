@@ -45,38 +45,32 @@ def collect_data_strategy(ctx, params=None):
     
     raw_trades = ctx.pop("active_trades_raw", [])
     
-    # --- ФОРМИРОВАНИЕ ТЕКСТОВОГО ОПИСАНИЯ СДЕЛКИ ---
-    trade_info_map = {} # id -> text
+    trade_info_map = {} 
+    partner_map = {}
     
     for t in raw_trades:
-        seller_id = t["seller_id"]
-        buyer_id = t["buyer_id"]
-        sugar_qty = t["sugar_qty"]
-        spice_qty = t["spice_qty"]
+        seller_id = int(t["seller_id"])
+        buyer_id = int(t["buyer_id"])
         
-        # Для ПРОДАВЦА: Он продал сахар, купил специи
-        # Текст: "Продал X сахара за Y специй"
-        seller_text = f"📦 Продал {int(sugar_qty)} Сах. за {int(spice_qty)} Спец."
+        # spice_qty уже int в новой версии trade_vectorized
+        spice_cost = t["spice_qty"] 
         
-        # Для ПОКУПАТЕЛЯ: Он купил сахар, заплатил специями
-        # Текст: "Купил X сахара за Y специй"
-        buyer_text = f"💰 Купил {int(sugar_qty)} Сах. за {int(spice_qty)} Спец."
+        # Текст для продавца: он отдал 1 сахар, получил spice_cost специй
+        trade_info_map[seller_id] = f"📦 Продажа: -1 Сах ➕ {spice_cost} Спец"
         
-        trade_info_map[seller_id] = seller_text
-        trade_info_map[buyer_id] = buyer_text
+        # Текст для покупателя: он отдал spice_cost специй, получил 1 сахар
+        trade_info_map[buyer_id] = f"💰 Покупка: +1 Сах ➖ {spice_cost} Спец"
         
-    # Обогащаем список агентов
+        # Сохраняем партнеров сразу
+        partner_map[seller_id] = buyer_id
+        partner_map[buyer_id] = seller_id
+    
+    # 2. Обогащаем список агентов за один проход O(N)
     for agent in agent_list:
-        aid = agent.get("id")
+        aid = int(agent.get("id"))
         if aid in trade_info_map:
             agent["trade_text"] = trade_info_map[aid]
-            # Также сохраним partner_id для связи линий, если нужно
-            # Найдем партнера по списку trades
-            for t in raw_trades:
-                if t["seller_id"] == aid:
-                    agent["trade_partner_id"] = t["buyer_id"]
-                elif t["buyer_id"] == aid:
-                    agent["trade_partner_id"] = t["seller_id"]
+            agent["trade_partner_id"] = partner_map[aid]
 
     step_data = {
         "step": int(step),

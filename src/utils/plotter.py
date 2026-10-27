@@ -103,9 +103,14 @@ def generate_wealth_distribution_chart(step_num: int, welfares: list) -> bytes:
     plt.close()
     return buf.getvalue()
 
-# --- НОВАЯ ФУНКЦИЯ ДЛЯ ГРАФИКА ЦЕН ---
-def generate_price_history_chart(steps: list, avg_sugar_prices: list, avg_spice_prices: list) -> bytes:
-    """График динамики средних обменных курсов ресурсов."""
+def generate_price_history_chart(steps: list, avg_sugar_prices: list) -> bytes:
+    """
+    График динамики средней стоимости единицы сахара (в специях).
+    
+    Так как сахар выступает базовой единицей обмена (1 шт.), 
+    мы отслеживаем только его цену в специях.
+    Линия цены специй удалена как производная и избыточная.
+    """
     plt.figure(figsize=(8, 5))
     
     # Фильтруем нули (шаги без сделок), чтобы график был чистым
@@ -113,7 +118,7 @@ def generate_price_history_chart(steps: list, avg_sugar_prices: list, avg_spice_
     
     if not valid_indices:
         plt.text(0.5, 0.5, "Нет данных о торгах\n(или цены равны 0)", ha='center', va='center', fontsize=12, color='gray')
-        plt.title("Динамика цен обмена")
+        plt.title("Динамика курса Сахара")
         buf = io.BytesIO()
         plt.savefig(buf, format='png', bbox_inches='tight')
         plt.close()
@@ -121,14 +126,12 @@ def generate_price_history_chart(steps: list, avg_sugar_prices: list, avg_spice_
 
     filtered_steps = [steps[i] for i in valid_indices]
     filtered_sugar_p = [avg_sugar_prices[i] for i in valid_indices]
-    filtered_spice_p = [avg_spice_prices[i] for i in valid_indices]
 
-    plt.plot(filtered_steps, filtered_sugar_p, label='Цена Сахара (в Специях)', color='orange', linewidth=2)
-    plt.plot(filtered_steps, filtered_spice_p, label='Цена Специй (в Сахаре)', color='red', linewidth=2, linestyle='--')
+    plt.plot(filtered_steps, filtered_sugar_p, label='Курс Сахара (Спец./Сах.)', color='orange', linewidth=2)
     
-    plt.xlabel('Шаг')
-    plt.ylabel('Относительная цена')
-    plt.title('Динамика средних обменных курсов')
+    plt.xlabel('Шаг симуляции')
+    plt.ylabel('Стоимость 1 сахара (в специях)')
+    plt.title('Рыночный курс: Сколько специй стоит один сахар?')
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.legend()
     
@@ -136,7 +139,6 @@ def generate_price_history_chart(steps: list, avg_sugar_prices: list, avg_spice_
     plt.savefig(buf, format='png', bbox_inches='tight')
     plt.close()
     return buf.getvalue()
-
 
 def generate_charts(
     steps: list, 
@@ -169,8 +171,8 @@ def generate_charts(
         charts["graphs/demographics.png"] = generate_demographics_chart(steps, avg_age, births, deaths)
 
     # Добавляем график цен, если данные есть
-    if avg_sugar_prices is not None and avg_spice_prices is not None:
-        charts["graphs/exchange_rates.png"] = generate_price_history_chart(steps, avg_sugar_prices, avg_spice_prices)
+    if avg_sugar_prices is not None:
+        charts["graphs/exchange_rates.png"] = generate_price_history_chart(steps, avg_sugar_prices)
 
     # Добавляем снимок распределения богатства на последнем шаге
     if final_welfares:
@@ -200,7 +202,6 @@ def render_charts_from_data(metrics_data: dict, final_welfares: list) -> dict[st
         deaths=metrics_data["deaths"],
         final_welfares=final_welfares,
         avg_sugar_prices=metrics_data.get("avg_sugar_prices"),
-        avg_spice_prices=metrics_data.get("avg_spice_prices")
     )
 
 import json

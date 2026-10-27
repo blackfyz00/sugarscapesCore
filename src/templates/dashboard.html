@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sugarscape Analytics Dashboard</title>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -36,6 +37,16 @@
     #chat-window {
       max-height: calc(100vh - 6rem);
     }
+    #chat-messages .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+    #chat-messages .prose ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+    #chat-messages .prose li { margin-top: 0.25rem; margin-bottom: 0.25rem; }
+    #chat-messages .prose strong { font-weight: bold; color: inherit; }
+    #chat-messages .prose em { font-style: italic; }
+    #chat-messages .prose code { background-color: rgba(0,0,0,0.1); padding: 0.2em 0.4em; border-radius: 0.25rem; font-family: monospace; font-size: 0.875em; }
+    #chat-messages .dark .prose code { background-color: rgba(255,255,255,0.1); }
+    #chat-messages .prose pre { background-color: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+    #chat-messages .prose h1, #chat-messages .prose h2, #chat-messages .prose h3 { font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; line-height: 1.25; }
+    #chat-messages .prose p { margin-top: 0.5rem; margin-bottom: 0.5rem; }
   </style>
 </head>
 
@@ -133,10 +144,10 @@
 
   <!-- AI CHAT WIDGET START -->
   <div id="ai-chat-widget" class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
-    <div
-      id="chat-window"
-      class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl w-80 h-96 flex flex-col overflow-hidden"
-    >
+      <div
+        id="chat-window"
+        class="hidden fixed inset-0 z-[60] bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-0 md:border md:border-slate-200 md:dark:border-slate-700 rounded-none md:rounded-xl shadow-2xl w-full h-full md:w-[85vw] md:h-[85vh] flex flex-col overflow-hidden transition-all duration-300 ease-in-out"
+      >
       <div
         class="p-3 bg-gradient-to-r from-blue-600 to-emerald-500 text-white font-semibold flex justify-between items-center cursor-pointer select-none"
         onclick="toggleChat()"
@@ -279,6 +290,7 @@
     let activeAiDiv = null;
     let awaitingResponse = false;
     let outbox = [];
+    let currentRawText = "";
     let reconnectTimer = null;
 
     function flushOutbox() {
@@ -320,43 +332,57 @@
       ws.onmessage = (event) => {
         const data = event.data;
 
+        // 1. Обработка конца ответа
         if (data === '[DONE]') {
           if (activeAiDiv && activeAiDiv.textContent === '...') {
-            activeAiDiv.textContent = '';
+            activeAiDiv.innerHTML = '<span class="text-slate-400 italic">Ответ пуст.</span>';
           }
-
+          
           awaitingResponse = false;
           activeAiDiv = null;
+          currentRawText = ""; // Сбрасываем буфер для следующего сообщения
           flushOutbox();
           return;
         }
 
+        // 2. Обработка ошибок
         if (typeof data === 'string' && data.startsWith('[ERROR]')) {
           if (activeAiDiv) {
-            activeAiDiv.textContent = data;
+            activeAiDiv.innerHTML = '<span class="text-red-500">' + data + '</span>';
           } else {
             addMessage('system', data);
           }
 
           awaitingResponse = false;
           activeAiDiv = null;
+          currentRawText = "";
           flushOutbox();
           return;
         }
 
-        if (!activeAiDiv) {
-          activeAiDiv = addMessage('ai', '');
+        // 3. Накопление текста потока
+        // Если это первый кусок нового ответа, убеждаемся, что буфер чист
+        if (!currentRawText && activeAiDiv && activeAiDiv.textContent === '...') {
+             currentRawText = ""; 
         }
 
-        if (activeAiDiv.textContent === '...') {
-          activeAiDiv.textContent = '';
-        }
+        currentRawText += data;
 
-        activeAiDiv.textContent += data;
-
-        const messages = document.getElementById('chat-messages');
-        if (messages) {
-          messages.scrollTop = messages.scrollHeight;
+        // 4. Рендеринг Markdown
+        if (activeAiDiv) {
+          try {
+            // marked.parse превращает "**жирный**" в <strong>жирный</strong>
+            activeAiDiv.innerHTML = marked.parse(currentRawText);
+          } catch (e) {
+            console.error("Markdown parse error:", e);
+            activeAiDiv.textContent = currentRawText; // Фолбек на обычный текст
+          }
+          
+          // Автоскролл вниз при поступлении новых данных
+          const messages = document.getElementById('chat-messages');
+          if (messages) {
+            messages.scrollTop = messages.scrollHeight;
+          }
         }
       };
 
@@ -554,8 +580,7 @@
 
     function renderPricesChart() {
       const steps = rawData.steps || [];
-      const sugarPrices = rawData.price_sugar || [];
-      const spicePrices = rawData.price_spice || [];
+      const sugarPrices = rawData.price_sugar || []; 
 
       const validIndices = sugarPrices
         .map((v, i) => v > 0 ? i : null)
@@ -571,29 +596,19 @@
 
       const filteredSteps = validIndices.map(i => steps[i]);
       const filteredSugarP = validIndices.map(i => sugarPrices[i]);
-      const filteredSpiceP = validIndices.map(i => spicePrices[i]);
 
       const traceSugarPrice = {
         x: filteredSteps,
         y: filteredSugarP,
         type: 'scatter',
         mode: 'lines+markers',
-        name: 'Цена Сахара (в Специях)',
+        name: 'Курс Сахара (Спец./Сах.)',
         line: { color: '#f59e0b', width: 2 },
         marker: { size: 6 }
       };
 
-      const traceSpicePrice = {
-        x: filteredSteps,
-        y: filteredSpiceP,
-        type: 'scatter',
-        mode: 'lines+markers',
-        name: 'Цена Специй (в Сахаре)',
-        line: { color: '#ef4444', width: 2, dash: 'dot' },
-        marker: { size: 6 }
-      };
-
-      Plotly.newPlot('chart-prices', [traceSugarPrice, traceSpicePrice], getBaseLayout('Обменные курсы'), plotOptions);
+      // Обновленный заголовок
+      Plotly.newPlot('chart-prices', [traceSugarPrice], getBaseLayout('Динамика курса Сахара'), plotOptions);
     }
 
     function renderDistributionChart() {
@@ -689,5 +704,6 @@
 
     document.addEventListener('DOMContentLoaded', initDashboard);
   </script>
+ 
 </body>
 </html>
