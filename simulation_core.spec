@@ -9,6 +9,12 @@ binaries = []
 
 hiddenimports = ['numpy', 'matplotlib.pyplot', 'PIL']
 hiddenimports += collect_submodules('scipy')
+hiddenimports += [
+    'pandas',
+    'openpyxl',
+    'pandas.io.formats.excel', 
+    'openpyxl.styles.numbers',
+]
 
 local_modules = [
     'core.agents',

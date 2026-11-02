@@ -1,5 +1,5 @@
 from registry import register_strategy
-from mechanics.movement.findperspectivecell import find_perspective_cell_vectorized
+from mechanics.movement.find_perspective_numba import find_perspective_cell_vectorized
 
 @register_strategy("movement_cobb_douglas")
 def movement_strategy(ctx, params=None):

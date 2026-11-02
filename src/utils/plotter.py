@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from .metrics import calculate_gini
+import shutil
 
 # Настройка шрифтов для кириллицы (раскомментируйте, если видите квадратики)
 # plt.rcParams['font.family'] = 'sans-serif'
@@ -210,10 +211,11 @@ from pathlib import Path
 def generate_html_dashboard(
     metrics_data: dict, 
     final_welfares: list, 
-    output_path: str = "report.html"
+    output_path: str = "sim_data.html",
+    excel_filename: str = None  
 ) -> str:
     """
-    Генерирует автономный HTML-дашборд, читая шаблон из templates/dashboard.html
+    Генерирует автономный HTML-дашборд, читая шаблон из templates/sim_data.html
     """
     
     # 1. Подготовка данных для JS (как было раньше)
@@ -251,7 +253,7 @@ def generate_html_dashboard(
     data_json_str = json.dumps(dashboard_data, ensure_ascii=False)
 
     # 2. Чтение шаблона
-    # Путь относительно текущего файла (src/utils/plotter.py -> src/templates/dashboard.html)
+    # Путь относительно текущего файла (src/utils/plotter.py -> src/templates/sim_data.html)
     template_dir = Path(__file__).parent.parent / "templates"
     template_path = template_dir / "dashboard.html"
     
@@ -262,11 +264,24 @@ def generate_html_dashboard(
         html_content = f.read()
 
     # 3. Подстановка данных
-    # Мы используем уникальные маркеры, чтобы не конфликтовать с JS/CSS
-    # В файле dashboard.html вместо {data_json_str} должно быть написано {{DATA_JSON}}
     html_content = html_content.replace("{{DATA_JSON}}", data_json_str)
+    target_excel_name = excel_filename if excel_filename else "sim_data.xlsx"
+    html_content = html_content.replace("{{EXCEL_FILENAME}}", target_excel_name)
 
-    # 4. Запись результата
+    # 4. Копирование Excel-файла рядом с HTML (для работы ссылки file://)
+    source_excel_path = Path(target_excel_name) # Предполагаем, что main.py создал его в текущей директории или указал путь
+    
+    # Если файл существует, копируем его в ту же папку, где будет лежать HTML
+    if source_excel_path.exists():
+        dest_dir = Path(output_path).parent
+        dest_excel_path = dest_dir / target_excel_name
+        
+        # Копируем только если источники разные, чтобы избежать ошибки SameFileError
+        if source_excel_path.resolve() != dest_excel_path.resolve():
+            shutil.copy2(source_excel_path, dest_excel_path)
+            print(f"📂 Copied Excel to: {dest_excel_path}")
+
+    # 5. Запись результата
     path_obj = Path(output_path)
     path_obj.parent.mkdir(parents=True, exist_ok=True)
     

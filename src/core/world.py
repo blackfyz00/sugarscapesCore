@@ -3,8 +3,8 @@ import numpy as np
 class WorldState:
     def __init__(self, size: int):
         self.size = size
-        self.sugar_map = np.zeros((size, size), dtype=np.int16)
-        self.spicy_map = np.zeros((size, size), dtype=np.int16)
+        self.sugar_map = np.zeros((size, size), dtype=np.int32)
+        self.spicy_map = np.zeros((size, size), dtype=np.int32)
         self.occupancy = np.full((size, size), -1, dtype=np.int32)
 
     def regenerate(self, rate_s: int, rate_p: int, max_val: int):

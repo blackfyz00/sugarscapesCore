@@ -2,6 +2,8 @@ import json
 import zipfile
 from pathlib import Path
 import numpy as np
+import pandas as pd
+from typing import Dict, List, Any
 
 def save_simulation_archive(
     history: list[dict], 
@@ -41,4 +43,127 @@ def save_simulation_archive(
         for path, data in charts.items():
             zipf.writestr(path, data)
             
+    return output_path.resolve()
+
+def export_to_excel(
+    metrics_data: dict, 
+    final_welfares: list, 
+    simulation_history: List[Dict[str, Any]], # <-- НОВЫЙ АРГУМЕНТ
+    filename: str = "sim_data.xlsx"
+):
+    """
+    Создает Excel файл с детальными данными симуляции.
+    Требует полную историю шагов (simulation_history), а не только метрики.
+    """
+    output_path = Path(filename)
+    
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        
+        # ==========================================
+        # 1. Summary Sheet (Агрегированные метрики)
+        # ==========================================
+        summary_df = pd.DataFrame({
+            "Step": metrics_data["steps"],
+            "Agent Count": metrics_data["agent_counts"],
+            "Total Sugar": metrics_data["total_sugar"],
+            "Total Spicy": metrics_data["total_spicy"],
+            "Median Welfare": metrics_data["median_welfare"],
+            "Median Age": metrics_data["median_age"],
+            "Gini Coefficient": metrics_data["gini_coeffs"],
+            "Births": metrics_data["births"],
+            "Deaths": metrics_data["deaths"],
+            "Avg Sugar Price": metrics_data["avg_sugar_prices"],
+            "Avg Spice Price": metrics_data["avg_spice_prices"]
+        })
+        summary_df.to_excel(writer, sheet_name="Summary", index=False)
+
+        # ==========================================
+        # 2. Trades Log (Детальная история сделок)
+        # ==========================================
+        all_trades = []
+        for step_data in simulation_history:
+            raw_trades = step_data.get("raw_trades", [])
+            for trade in raw_trades:
+                # Добавляем номер шага к каждой сделке
+                record = {
+                    "Step": step_data["step"],
+                    "Seller ID": trade["seller_id"],
+                    "Buyer ID": trade["buyer_id"],
+                    "Sugar Qty": trade["sugar_qty"],
+                    "Spice Qty": trade["spice_qty"]
+                }
+                all_trades.append(record)
+        
+        if all_trades:
+            trades_df = pd.DataFrame(all_trades)
+            trades_df.to_excel(writer, sheet_name="Trades Log", index=False)
+        else:
+            # Создаем пустой лист с заголовками, если сделок не было
+            pd.DataFrame(columns=["Step", "Seller ID", "Buyer ID", "Sugar Qty", "Spice Qty"]).to_excel(
+                writer, sheet_name="Trades Log", index=False
+            )
+
+        # ==========================================
+        # 3. Agents Final State (Состояние агентов на последнем шаге)
+        # ==========================================
+        # Можно заменить -1 на конкретный индекс шага, если нужно другое состояние
+        last_step_idx = len(simulation_history) - 1
+        
+        if last_step_idx >= 0 and simulation_history[last_step_idx].get("agents"):
+            agents_list = simulation_history[last_step_idx]["agents"]
+            
+            # Преобразуем список словарей в DataFrame
+            # Важно: некоторые поля могут отсутствовать у некоторых агентов, pandas обработает это как NaN
+            agents_df = pd.DataFrame(agents_list)
+            
+            # Упорядочиваем колонки для читаемости
+            preferred_cols = ["id", "x", "y", "sugar", "spicy", "age", "max_age", "children_count", "vis"]
+            existing_cols = [c for c in preferred_cols if c in agents_df.columns]
+            other_cols = [c for c in agents_df.columns if c not in existing_cols]
+            
+            agents_df = agents_df[existing_cols + other_cols]
+            agents_df.to_excel(writer, sheet_name="Agents Final State", index=False)
+
+        # ==========================================
+        # 4. World Map Final (Финальная карта ресурсов)
+        # ==========================================
+        # Это может быть медленно для больших карт, поэтому делаем опционально или только финал
+        if last_step_idx >= 0:
+            sugar_map = simulation_history[last_step_idx].get("sugar_map")
+            spicy_map = simulation_history[last_step_idx].get("spicy_map")
+            
+            if sugar_map and spicy_map:
+                # Транспонируем, чтобы X был в строках, Y в столбцах (как принято в Excel-сетках)
+                # Или оставляем как есть, зависит от предпочтения пользователя
+                
+                # Создаем DataFrame из списка списков
+                world_df = pd.DataFrame(sugar_map)
+                
+                # Добавляем специи во второй набор колонок? 
+                # Лучше сделать два отдельных блока или объединить. 
+                # Для простоты создадим один лист "Final World" со смешанными данными или двумя таблицами.
+                # Здесь мы просто выгрузим Сахар, так как две матрицы в одном листе выглядят плохо.
+                
+                world_df.to_excel(writer, sheet_name="Final Sugar Map", index=False, header=False)
+                
+                # Если хочешь также Специи, раскомментируй ниже:
+                # spicy_df = pd.DataFrame(spicy_map)
+                # spicy_df.to_excel(writer, sheet_name="Final Spice Map", index=False, header=False)
+
+        # ==========================================
+        # 5. Simple Metric Sheets (для быстрых графиков)
+        # ==========================================
+        simple_metrics = {
+            "Population": "agent_counts",
+            "Sugar Reserves": "total_sugar",
+            "Spice Reserves": "total_spicy",
+            "Welfare Trend": "median_welfare",
+            "Age Trend": "median_age",
+            "Inequality (Gini)": "gini_coeffs"
+        }
+        
+        for sheet_name, data_key in simple_metrics.items():
+            df = pd.DataFrame({"Step": metrics_data["steps"], "Value": metrics_data[data_key]})
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
     return output_path.resolve()

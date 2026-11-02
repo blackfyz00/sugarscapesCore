@@ -55,23 +55,40 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
     <header class="flex justify-between items-center mb-8 pb-4 border-b border-slate-200 dark:border-slate-800">
-      <div>
-        <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
-          Sugarscape Core
-        </h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Интерактивный аналитический отчет
-        </p>
-      </div>
-
-      <button
-        id="theme-toggle"
-        class="p-2 rounded-lg bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-all focus:outline-none ring-2 ring-blue-500/20"
-      >
-        <span id="theme-icon">🌙</span>
-      </button>
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
+                Sugarscape Core
+            </h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Интерактивный аналитический отчет
+            </p>
+        </div>
+    
+        <!-- Контейнер для правых элементов -->
+        <div class="flex items-center gap-4">
+            
+            <!-- Кнопка скачивания Excel -->
+            <a 
+                href="/download-excel" 
+                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-md transition-colors flex items-center gap-2 no-underline text-sm font-medium"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Скачать .xlsx
+            </a>
+            
+            <!-- Кнопка смены темы -->
+            <button
+                id="theme-toggle"
+                class="p-2 rounded-lg bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-all focus:outline-none ring-2 ring-blue-500/20 flex items-center justify-center h-10 w-10"
+            >
+                <span id="theme-icon">🌙</span>
+            </button>
+    
+        </div>
     </header>
-
+  
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       <div class="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
         <p class="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">

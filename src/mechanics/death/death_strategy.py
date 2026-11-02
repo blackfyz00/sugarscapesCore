@@ -17,16 +17,25 @@ def death_strategy(ctx, params=None):
         
         dead_mask_local = is_starved | is_old
         dead_indices = alive[dead_mask_local]
-        
+    
         if len(dead_indices) > 0:
-            # Очищаем occupancy на сетке мира
-            for idx in dead_indices:
-                x, y = agents.x[idx], agents.y[idx]
-                if world.occupancy[y, x] == agents.id[idx]:
-                    world.occupancy[y, x] = -1
+            # Получаем координаты всех мертвых
+            dx = agents.x[dead_indices]
+            dy = agents.y[dead_indices]
+            
+            # Векторизованная проверка: совпадает ли ID в клетке с ID умершего?
+            current_ids_in_cells = world.occupancy[dy, dx]
+            matches = current_ids_in_cells == agents.id[dead_indices]
+            
+            # Обновляем только те клетки, где агент действительно был
+            # Используем fancy indexing для присваивания
+            valid_dy = dy[matches]
+            valid_dx = dx[matches]
+            world.occupancy[valid_dy, valid_dx] = -1
             
             # Убиваем в AgentSystem
             agents.kill(dead_indices)
+
     else:
         # Fallback
         agents_map = ctx["agents_map"]

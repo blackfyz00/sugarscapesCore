@@ -180,6 +180,23 @@ def load_context(json_path: str):
         print(f"❌ CRITICAL: NO HTML FILE FOUND IN FOLDER!")
         STATE["html_path"] = "" 
 
+@app.get("/download-excel")
+async def download_excel():
+    if not STATE["html_path"]:
+         raise HTTPException(status_code=404, detail="No data loaded")
+         
+    excel_name = Path(STATE["html_path"]).stem + ".xlsx"
+    excel_path = Path(STATE["html_path"]).parent / excel_name
+    
+    if not excel_path.exists():
+        raise HTTPException(status_code=404, detail="Excel file not generated yet")
+        
+    return FileResponse(
+        path=excel_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=excel_name
+    )
+    
 def run_server(data_path: str, port: int):
     load_context(data_path)
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")

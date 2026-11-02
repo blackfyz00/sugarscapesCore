@@ -195,15 +195,34 @@ def main():
         )
         print(f"✅ Simulation finished. Archive saved: {Path(output_path).resolve()}")
 
+        # ===EXPORT TO EXCEL ===
+        excel_filename = Path(args.output).with_suffix('.xlsx')
+        
+        try:
+            from utils.excel_exporter import export_to_excel # Импорт новой функции
+            
+            excel_filename = Path(args.output).with_suffix('.xlsx')
+            export_to_excel(
+                metrics_data=metrics_data,
+                final_welfares=final_welfares,
+                simulation_history=simulation_history, # <--- ПЕРЕДАЕМ ПОЛНУЮ ИСТОРИЮ
+                filename=str(excel_filename)
+            )
+            print(f"📊 Excel Report created: {excel_filename}")
+        except Exception as e:
+            print(f"⚠️ Ошибка при генерации Excel-отчета: {e}", file=sys.stderr)
+        
+        # 2. Генерация HTML (теперь безопасна, т.к. excel_filename определен выше)
         try:
             report_filename = Path(args.output).with_suffix('.html')
             
             dashboard_path = generate_html_dashboard(
                 metrics_data=metrics_data,
                 final_welfares=final_welfares,
-                output_path=str(report_filename)
+                output_path=str(report_filename),
+                excel_filename=excel_filename.name
             )
-            print(f"🎨 Interactive report created: {dashboard_path}")
+            print(f" Interactive report created: {dashboard_path}")
         except Exception as e:
             print(f"⚠️ Error generating HTML report: {e}", file=sys.stderr)
 

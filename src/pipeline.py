@@ -35,7 +35,7 @@ def collect_data_strategy(ctx, params=None):
                 else:
                     clean_agent[k] = v
             agent_list.append(clean_agent)
-            
+        agent_list.sort(key=lambda x: x['id'])
     else:
         grid = ctx["grid"]
         agents_map = ctx["agents_map"]
