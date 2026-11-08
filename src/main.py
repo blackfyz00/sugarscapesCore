@@ -32,7 +32,7 @@ from core.world import WorldState
 from core.agents import AgentSystem
 from utils.metrics import aggregate_metrics
 from utils.exporter import save_simulation_archive
-from utils.plotter import render_charts_from_data, generate_html_dashboard  
+from utils.html_dashboard import generate_html_dashboard  
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Sugarscapes Simulation Core")
@@ -177,8 +177,6 @@ def main():
         print("📊 Processing data...")
         metrics_data, final_welfares = aggregate_metrics(simulation_history)
         
-        charts = render_charts_from_data(metrics_data, final_welfares)
-
         metadata = {
             "total_steps": len(simulation_history),
             "grid_width": grid_size,
@@ -188,7 +186,6 @@ def main():
 
         output_path = save_simulation_archive(
             history=simulation_history,
-            charts=charts,
             metadata=metadata,
             filename=args.output,
             world=world

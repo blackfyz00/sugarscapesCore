@@ -7,7 +7,7 @@ datas = [
 
 binaries = []
 
-hiddenimports = ['numpy', 'matplotlib.pyplot', 'PIL']
+hiddenimports = ['numpy', 'PIL']
 hiddenimports += collect_submodules('scipy')
 hiddenimports += [
     'pandas',
@@ -22,7 +22,7 @@ local_modules = [
     'classes',
     'utils.create_map',
     'utils.metrics',
-    'utils.plotter',
+    'utils.html_dashboard',
     'utils.exporter',
     'pipeline',
     'registry',

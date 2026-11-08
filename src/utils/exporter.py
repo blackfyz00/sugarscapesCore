@@ -7,13 +7,12 @@ from typing import Dict, List, Any
 
 def save_simulation_archive(
     history: list[dict], 
-    charts: dict[str, bytes], 
     metadata: dict, 
     filename: str = "sim_data.zip",
     world = None
 ):
     """
-    Экспорт симуляции: сохраняет JSON метаданные, историю, графики 
+    Экспорт симуляции: сохраняет JSON метаданные, историю
     и бинарные NumPy файлы (.npy) для быстрой загрузки в Godot.
     """
     output_path = Path(filename)
@@ -39,9 +38,6 @@ def save_simulation_archive(
             occupancy_bytes = io.BytesIO()
             np.save(occupancy_bytes, world.occupancy)
             zipf.writestr("final_occupancy.npy", occupancy_bytes.getvalue())
-            
-        for path, data in charts.items():
-            zipf.writestr(path, data)
             
     return output_path.resolve()
 
