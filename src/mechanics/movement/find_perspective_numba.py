@@ -50,58 +50,74 @@ def _move_core(
         sub_p = world_spicy[ymin:ymax, xmin:xmax]
         sub_o = world_occ[ymin:ymax, xmin:xmax]
         
+        h = ymax - ymin
+        w = xmax - xmin
+        
         pot_s = cur_s + sub_s
         pot_p = cur_p + sub_p
         
         welfares = (np.maximum(0.0, pot_s) ** (sm / mt)) * (np.maximum(0.0, pot_p) ** (spm / mt))
         
-        rows = np.arange(ymin, ymax)
-        cols = np.arange(xmin, xmax)
-        grid_y, grid_x = np.meshgrid(rows, cols, indexing='ij')
-        
-        dist_sq = (grid_x - x)**2 + (grid_y - y)**2
-        valid_mask = (dist_sq <= v*v) & ((sub_o == -1) | ((grid_x == x) & (grid_y == y)))
-        
-        if not np.any(valid_mask):
-            continue
-            
-        welfares[~valid_mask] = -1.0
-        max_w = np.max(welfares)
+        max_w = -1.0
+        best_dx = 0
+        best_dy = 0
+        found_better = False
         
         curr_w = (max(0.0, cur_s) ** (sm / mt)) * (max(0.0, cur_p) ** (spm / mt))
         
-        if max_w <= curr_w + 1e-5:
-            continue
+        for dy in range(h):
+            abs_y = ymin + dy
+            dist_y_sq = (abs_y - y) ** 2
             
-        best_locs = np.argwhere(welfares == max_w)
-        if len(best_locs) == 0:
-            continue
-        
-        bl_y_off = best_locs[:, 0]
-        bl_x_off = best_locs[:, 1]
-        abs_dists = (bl_y_off + ymin - y)**2 + (bl_x_off + xmin - x)**2
-        min_idx = np.argmin(abs_dists)
-        
-        target_y = int(bl_y_off[min_idx] + ymin)
-        target_x = int(bl_x_off[min_idx] + xmin)
-        
-        dx = np.sign(target_x - x)
-        dy = np.sign(target_y - y)
-        nx = int(x + dx)
-        ny = int(y + dy)
-        
-        if 0 <= nx < size and 0 <= ny < size and world_occ[ny, nx] == -1:
-            world_occ[y, x] = -1
-            world_occ[ny, nx] = agents_id[global_i]
-            agents_x[global_i] = nx
-            agents_y[global_i] = ny
+            for dx in range(w):
+                abs_x = xmin + dx
+                dist_x_sq = (abs_x - x) ** 2
+                
+                if dist_x_sq + dist_y_sq > v * v:
+                    continue
+                
+                is_current_pos = (abs_x == x) and (abs_y == y)
+                is_empty = sub_o[dy, dx] == -1
+                
+                if not (is_empty or is_current_pos):
+                    continue
+                
+                w_val = welfares[dy, dx]
+                
+                if w_val > curr_w + 1e-5:
+                    if w_val > max_w:
+                        max_w = w_val
+                        best_dx = dx
+                        best_dy = dy
+                        found_better = True
+                    elif w_val == max_w:
+                        old_dist_sq = best_dx**2 + best_dy**2
+                        new_dist_sq = dx**2 + dy**2
+                        if new_dist_sq < old_dist_sq:
+                            best_dx = dx
+                            best_dy = dy
+
+        if found_better:
+            target_x = xmin + best_dx
+            target_y = ymin + best_dy
+            
+            dx_step = np.sign(target_x - x)
+            dy_step = np.sign(target_y - y)
+            
+            nx = int(x + dx_step)
+            ny = int(y + dy_step)
+            
+            if 0 <= nx < size and 0 <= ny < size and world_occ[ny, nx] == -1:
+                world_occ[y, x] = -1
+                world_occ[ny, nx] = agents_id[global_i]
+                agents_x[global_i] = nx
+                agents_y[global_i] = ny
 
 def find_perspective_cell_vectorized(world, agents):
     """Подготавливает данные и вызывает ядро Numba БЕЗ КОПИРОВАНИЯ"""
     alive = agents.get_alive_indices()
     if len(alive) == 0:
         return
-    
     
     ws = world.sugar_map.astype(np.float32, copy=False)
     wp = world.spicy_map.astype(np.float32, copy=False)

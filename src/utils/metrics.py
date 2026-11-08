@@ -78,7 +78,8 @@ def extract_step_metrics(step_data: dict, prev_agent_ids: set) -> tuple[dict, se
         "births": len(current_ids - prev_agent_ids),
         "deaths": len(prev_agent_ids - current_ids),
         "avg_sugar_price": avg_sugar_price,
-        "avg_spice_price": avg_spice_price
+        "avg_spice_price": avg_spice_price,
+        "welfares": welfares
     }
     
     return metrics, current_ids
@@ -102,7 +103,7 @@ def aggregate_metrics(history: list[dict]) -> tuple[dict, list]:
     }
     
     prev_ids = set()
-    final_welfares = []
+    final_welfares = [] # Инициализация обязательна
 
     for i, step_data in enumerate(history):
         m, prev_ids = extract_step_metrics(step_data, prev_ids)
@@ -121,17 +122,6 @@ def aggregate_metrics(history: list[dict]) -> tuple[dict, list]:
         result["avg_sugar_prices"].append(m["avg_sugar_price"])
         result["avg_spice_prices"].append(m["avg_spice_price"])
         
-        if i == len(history) - 1:
-            agents = step_data.get("agents", {})
-            agent_list = list(agents.values()) if isinstance(agents, dict) else agents
-            final_welfares = [
-                calculate_welfare_cobb_douglas(
-                    sugar=a.get("sugar", 0.0),
-                    spicy=a.get("spicy", 0.0),
-                    sugarm=a.get("sugarm", 0.0),
-                    spicym=a.get("spicym", 0.0)
-                ) 
-                for a in agent_list
-            ]
+        final_welfares = m["welfares"] 
 
     return result, final_welfares

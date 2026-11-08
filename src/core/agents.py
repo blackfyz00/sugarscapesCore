@@ -8,19 +8,16 @@ class AgentSystem:
         self.id = np.full(capacity, -1, dtype=np.int32)
         self.x = np.zeros(capacity, dtype=np.int32)
         self.y = np.zeros(capacity, dtype=np.int32)
-        self.sugar = np.zeros(capacity, dtype=np.float32)
-        self.spicy = np.zeros(capacity, dtype=np.float32)
-        self.sugarm = np.zeros(capacity, dtype=np.float32)
-        self.spicym = np.zeros(capacity, dtype=np.float32)
+        self.sugar = np.zeros(capacity, dtype=np.int32)
+        self.spicy = np.zeros(capacity, dtype=np.int32)
+        self.sugarm = np.zeros(capacity, dtype=np.int32)
+        self.spicym = np.zeros(capacity, dtype=np.int32)
         self.vis = np.ones(capacity, dtype=np.int32)
         self.age = np.zeros(capacity, dtype=np.int32)
         self.max_age = np.full(capacity, 80, dtype=np.int32)
         self.children_count = np.zeros(capacity, dtype=np.int32)
         self.alive_mask = np.zeros(capacity, dtype=bool)
         
-        # Additional flexible fields stored as dicts or extra mapping if needed,
-        # but standard pipeline keys are covered.
-        self.history_trades = {i: [] for i in range(capacity)}
         self.is_trading = np.zeros(capacity, dtype=bool)
 
     def spawn(self, agent_id: int, x: int, y: int, data: dict) -> int:
@@ -43,7 +40,6 @@ class AgentSystem:
         self.max_age[idx] = data.get("max_age", 80)
         self.children_count[idx] = data.get("children_count", 0)
         self.alive_mask[idx] = True
-        self.history_trades[idx] = data.get("history_trades", [])
         self.is_trading[idx] = False
         return idx
 
@@ -73,7 +69,6 @@ class AgentSystem:
                 "age": int(self.age[idx]),
                 "max_age": int(self.max_age[idx]),
                 "children_count": int(self.children_count[idx]),
-                "history_trades": self.history_trades[idx],
                 "is_trading": bool(self.is_trading[idx])
             }
         return agents_map
@@ -93,5 +88,3 @@ class AgentSystem:
                 self.spicy[idx] = agent["spicy"]
                 self.children_count[idx] = agent.get("children_count", 0)
                 self.is_trading[idx] = agent.get("is_trading", False)
-                if "history_trades" in agent:
-                    self.history_trades[idx] = agent["history_trades"]

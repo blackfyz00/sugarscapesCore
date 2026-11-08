@@ -199,13 +199,12 @@ def main():
         excel_filename = Path(args.output).with_suffix('.xlsx')
         
         try:
-            from utils.excel_exporter import export_to_excel # Импорт новой функции
+            from utils.exporter import export_to_excel 
             
             excel_filename = Path(args.output).with_suffix('.xlsx')
             export_to_excel(
                 metrics_data=metrics_data,
-                final_welfares=final_welfares,
-                simulation_history=simulation_history, # <--- ПЕРЕДАЕМ ПОЛНУЮ ИСТОРИЮ
+                simulation_history=simulation_history, 
                 filename=str(excel_filename)
             )
             print(f"📊 Excel Report created: {excel_filename}")

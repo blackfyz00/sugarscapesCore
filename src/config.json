@@ -1,7 +1,6 @@
 {
 	"agent": {
 		"age": 0,
-		"history_trades": [],
 		"max_age": [70, 110], 
 		"spicy": [50, 100], 
 		"spicym": [1, 2],

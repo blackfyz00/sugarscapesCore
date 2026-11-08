@@ -1,4 +1,5 @@
 from registry import register_strategy
+import numpy as np
 
 @register_strategy("eat_all")
 def eat_strategy(ctx, params=None):
@@ -18,28 +19,30 @@ def eat_strategy(ctx, params=None):
         xs = agents.x[alive]
         ys = agents.y[alive]
         
-        # Сбор ресурсов с карт мира в позициях агентов
-        harvested_sugar = world.sugar_map[ys, xs].astype(float) * procent
-        harvested_spicy = world.spicy_map[ys, xs].astype(float) * procent
+        harvested_sugar_float = world.sugar_map[ys, xs].astype(np.float64) * procent
+        harvested_spicy_float = world.spicy_map[ys, xs].astype(np.float64) * procent
         
-        # Обнуляем ресурсы на клетках
         world.sugar_map[ys, xs] = 0
         world.spicy_map[ys, xs] = 0
         
-        # Применяем к агентам: + собранное, - метаболизм
-        agents.sugar[alive] += harvested_sugar - agents.sugarm[alive]
-        agents.spicy[alive] += harvested_spicy - agents.spicym[alive]
-    else:
-        # Fallback для старой логики со словарями
-        import random
-        grid = ctx["grid"]
-        agents_map = ctx["agents_map"]
-        agents_list = list(agents_map.values())
-        random.shuffle(agents_list)
-        for agent in agents_list:
-            if agent["id"] not in agents_map:
-                continue
-            cx, cy = agent["x"], agent["y"]
-            cell = grid[cy][cx]
-            from mechanics.eat.eat import eat
-            eat(cell, agents_map, grid, **params)
+        net_change_sugar = harvested_sugar_float - agents.sugarm[alive].astype(np.float64)
+        net_change_spicy = harvested_spicy_float - agents.spicym[alive].astype(np.float64)
+        
+        target_dtype = agents.sugar.dtype
+        
+        new_sugar_vals = agents.sugar[alive].astype(np.float64) + net_change_sugar
+        
+        # Защита от отрицательных значений, если тип беззнаковый (uint*)
+        if np.issubdtype(target_dtype, np.unsignedinteger):
+            new_sugar_vals = np.maximum(new_sugar_vals, 0)
+            
+        # Округление до целого и приведение к нужному типу
+        agents.sugar[alive] = np.round(new_sugar_vals).astype(target_dtype)
+        
+        # Аналогично для специй
+        new_spicy_vals = agents.spicy[alive].astype(np.float64) + net_change_spicy
+        
+        if np.issubdtype(target_dtype, np.unsignedinteger):
+            new_spicy_vals = np.maximum(new_spicy_vals, 0)
+            
+        agents.spicy[alive] = np.round(new_spicy_vals).astype(target_dtype)

@@ -17,8 +17,7 @@ MODULE_MAPPING = {
     },
     "trading_cobb_douglas": {
         "strategy": "trade.trade_cobb_strategy",
-        "required_fields": ["sugarm", "spicym", "history_trades"],
-        "defaults": {"history_trades": []} 
+        "required_fields": ["sugarm", "spicym"],
     },
     "reproduction": {
           "strategy": "reproduce.reproduce_strategy",

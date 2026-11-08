@@ -1,16 +1,15 @@
-# src/pipeline.py
 import copy
 import numpy as np  
 from functools import partial
 from registry import register_strategy, REGISTRY, load_mechanic, MODULE_MAPPING
 from utils.ai_context import build_ai_context
+from utils.welfare_cobb import calculate_welfare_cobb_douglas 
 
 @register_strategy("reset_flags")
 def reset_flags_strategy(ctx, params=None):
     agents = ctx.get("agents")
     if agents is not None:
         agents.is_trading.fill(False)
-    # Сбрасываем буфер торгов на каждом шаге, чтобы не накапливать мусор
     ctx["active_trades_raw"] = [] 
 
 @register_strategy("collect_data")
@@ -25,8 +24,10 @@ def collect_data_strategy(ctx, params=None):
         
         agents_dict_map = agents.to_dict_map()
         agent_list = []
+        
         for aid, agent in agents_dict_map.items():
             clean_agent = {}
+            
             for k, v in agent.items():
                 if isinstance(v, np.integer):
                     clean_agent[k] = int(v)
@@ -34,7 +35,18 @@ def collect_data_strategy(ctx, params=None):
                     clean_agent[k] = float(v)
                 else:
                     clean_agent[k] = v
+            
+            s_val = clean_agent.get('sugar', 0.0)
+            p_val = clean_agent.get('spicy', 0.0)
+            sm_val = clean_agent.get('sugarm', 1.0)
+            pm_val = clean_agent.get('spicym', 1.0)
+            
+            welfare_u = calculate_welfare_cobb_douglas(s_val, p_val, sm_val, pm_val)
+            
+            clean_agent['welfare'] = round(welfare_u, 4)
+            
             agent_list.append(clean_agent)
+            
         agent_list.sort(key=lambda x: x['id'])
     else:
         grid = ctx["grid"]
@@ -42,7 +54,8 @@ def collect_data_strategy(ctx, params=None):
         current_sugar_map = [[cell["sugar"] for cell in row] for row in grid]
         current_spicy_map = [[cell["spicy"] for cell in row] for row in grid]
         agent_list = list(agents_map.values())
-    
+        
+        
     raw_trades = ctx.pop("active_trades_raw", [])
     
     trade_info_map = {} 
@@ -52,20 +65,15 @@ def collect_data_strategy(ctx, params=None):
         seller_id = int(t["seller_id"])
         buyer_id = int(t["buyer_id"])
         
-        # spice_qty уже int в новой версии trade_vectorized
         spice_cost = t["spice_qty"] 
         
-        # Текст для продавца: он отдал 1 сахар, получил spice_cost специй
-        trade_info_map[seller_id] = f"📦 Продажа: -1 Сах ➕ {spice_cost} Спец"
+        trade_info_map[seller_id] = f"📦 Продажа: -1 Сах + {spice_cost} Спец"
         
-        # Текст для покупателя: он отдал spice_cost специй, получил 1 сахар
-        trade_info_map[buyer_id] = f"💰 Покупка: +1 Сах ➖ {spice_cost} Спец"
+        trade_info_map[buyer_id] = f"💰 Покупка: +1 Сах - {spice_cost} Спец"
         
-        # Сохраняем партнеров сразу
         partner_map[seller_id] = buyer_id
         partner_map[buyer_id] = seller_id
     
-    # 2. Обогащаем список агентов за один проход O(N)
     for agent in agent_list:
         aid = int(agent.get("id"))
         if aid in trade_info_map:
@@ -76,7 +84,7 @@ def collect_data_strategy(ctx, params=None):
         "step": int(step),
         "sugar_map": current_sugar_map,
         "spicy_map": current_spicy_map,
-        "agents": agent_list,      
+        "agents": agent_list,
         "raw_trades": raw_trades   
     }
     ai_summary = build_ai_context(step_data)
